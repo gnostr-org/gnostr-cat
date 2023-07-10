@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate log;
 
-use nostcat::{cli, read_input, request};
-use nostcat::{Config, ServerResponse};
+use gnostr_cat::{cli, read_input, request};
+use gnostr_cat::{Config, ServerResponse};
 use tokio::sync::mpsc;
 
 #[tokio::main]

@@ -1,12 +1,16 @@
 [package]
-name = "nostcat"
-description = "Websocket client for nostr relay scripting"
-version = "0.3.3"
+name = "gnostr-cat"
+description = "Nostcat fork for gnostr relay scripting"
+version = "0.0.0"
 edition = "2021"
-repository = "https://github.com/blakejakopovic/nostcat"
+repository = "https://github.com/gnostr-org/gnostr-cat"
 license-file = "LICENSE"
 readme = "README.md"
-keywords = ["nostr", "nostr-protocol", "websocket", "cli"]
+keywords = ["nostr", "gnostr", "git", "nostcat"]
+
+[[bin]]
+name = "gnostr-cat"
+path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

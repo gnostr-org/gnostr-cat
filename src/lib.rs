@@ -53,8 +53,8 @@ impl Response {
 }
 
 pub fn cli() -> Command {
-    Command::new("nostcat")
-        .about("Websocket client for nostr relay scripting")
+    Command::new("gnostr-cat")
+        .about("Websocket client for gnostr relay scripting")
         .version(option_env!("CARGO_PKG_VERSION").unwrap_or(""))
         .author("Blake Jakopovic")
         .arg_required_else_help(true)
