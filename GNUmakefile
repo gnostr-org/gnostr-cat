@@ -86,7 +86,8 @@ help:##
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
 rustup-install:## 	
 	curl –proto ‘=https’ –tlsv1.2 -sSf https://sh.rustup.rs | sh && exec bash
-cargo-build:## 	
+cargo-build:##	
+	@type -P rustc || $(MAKE) rustup-install
 	cargo b
 cargo-check:## 	
 	cargo c
