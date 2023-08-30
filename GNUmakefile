@@ -89,6 +89,9 @@ rustup-install:##
 cargo-build:## 	
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
+cargo-build-release:## 	
+	@type -P rustc || $(MAKE) rustup-install
+	cargo build --release
 cargo-check:## 	
 	cargo c
 install:cargo-install## 	
