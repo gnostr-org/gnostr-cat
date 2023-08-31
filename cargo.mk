@@ -9,7 +9,8 @@ cargo-build:###	cargo build
 	@RUST_BACKTRACE=all cargo b $(QUIET)
 cargo-install:###	cargo install --path .
 	#@. $(HOME)/.cargo/env
-	@cargo install --path $(PWD)
+	#@cargo install --path $(PWD)
+	@cargo install --locked --path $(PWD)
 cargo-br:cargo-build-release###	cargo-br
 ## 	make cargo-br q=true
 cargo-build-release:###	cargo-build-release
