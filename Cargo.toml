@@ -1,7 +1,11 @@
 [package]
 name = "gnostr-cat"
 description = "Nostcat fork for gnostr relay scripting"
+<<<<<<< HEAD
 version = "0.0.3"
+=======
+version = "0.0.0"
+>>>>>>> 2f66376 (make: cargo-build: detect if rustc else install rustup)
 edition = "2021"
 repository = "https://github.com/gnostr-org/gnostr-cat"
 license-file = "LICENSE"
