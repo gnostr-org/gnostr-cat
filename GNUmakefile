@@ -86,7 +86,7 @@ help:##
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
 rustup-install:## 	
 	bash -c "[ '$(shell uname -s)' == 'Darwin' ] && brew install rustup || echo"
-	bash -c "[ '$(shell uname -s)' == 'Linux' ] && apt-get install rustup || echo"
+	bash -c "[ '$(shell uname -s)' == 'Linux' ] && apt-get install rustup --fix-missing || echo"
 cargo-build:## 	
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
