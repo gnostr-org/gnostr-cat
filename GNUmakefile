@@ -88,6 +88,7 @@ rustup-install:##
 	bash -c "[ '$(shell uname -s)' == 'Darwin' ] && brew install rustup || echo"
 	bash -c "[ '$(shell uname -s)' == 'Linux' ] && apt-get install rustup --fix-missing || echo"
 	rustup default nightly
+	curl –proto ‘=https’ –tlsv1.2 -sSf https://sh.rustup.rs | sh && exec bash
 cargo-build:## 	
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
