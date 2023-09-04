@@ -85,8 +85,11 @@ export PYTHON_VERSION
 help:## 	
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
 rustup-install:## 	
-	export
-	RUSTUP_INIT_SKIP_PATH_CHECK=yes curl –proto ‘=https’ –tlsv1.2 -sSf https://sh.rustup.rs | sh && exec bash
+##	install rustup sequence
+	$(shell echo which rustup) || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --no-modify-path --default-toolchain nightly --profile default & source "$(HOME)/.cargo/env"
+	$(shell echo which rustup) && rustup default nightly
+
+
 cargo-build:## 	
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
