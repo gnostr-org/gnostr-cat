@@ -82,24 +82,24 @@ export PYTHON_VERSION
 
 -:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?##/ {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-help:## 	
+help:##
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
-rustup-install:## 	
+rustup-install:##
 ##	install rustup sequence
-	$(shell echo which rustup) || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --no-modify-path --default-toolchain nightly --profile default & source "$(HOME)/.cargo/env"
+	$(shell echo which rustup) || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --no-modify-path --default-toolchain nightly --profile default & . "$(HOME)/.cargo/env"
 	$(shell echo which rustup) && rustup default nightly
 
 
-cargo-build:## 	
+cargo-build:##
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
-cargo-build-release:## 	
+cargo-build-release:##
 	@type -P rustc || $(MAKE) rustup-install
 	cargo build --release
-cargo-check:## 	
+cargo-check:##
 	cargo c
-install:cargo-install## 	
-cargo-install:## 	
+install:cargo-install##
+cargo-install:##
 	cargo install --path .
 -include Makefile
 -include act.mk
