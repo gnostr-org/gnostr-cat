@@ -5,6 +5,14 @@ PROJECT_NAME                            := $(project)
 endif
 export PROJECT_NAME
 
+## https://doc.rust-lang.org/cargo/reference/profiles.html#custom-profiles
+## CARGO_PROFILE_RELEASE_DEBUG
+ifeq ($(profile),)
+PROFILE=release
+else
+PROFILE=release-with-debug
+endif
+
 OS                                      :=$(shell uname -s)
 export OS
 OS_VERSION                              :=$(shell uname -r)
@@ -82,24 +90,28 @@ export PYTHON_VERSION
 
 -:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?##/ {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-help:##
+help:## 	help
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
-rustup-install:##
+rustup-install:## 	rustup-install
 ##	install rustup sequence
 	$(shell echo which rustup) || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --no-modify-path --default-toolchain nightly --profile default & . "$(HOME)/.cargo/env"
 	$(shell echo which rustup) && rustup default nightly
 
 
-cargo-build:##
+cargo-b:## 	cargo-b
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
-cargo-build-release:##
+cargo-b-release:## 	cargo-b-release
 	@type -P rustc || $(MAKE) rustup-install
 	cargo build --release
-cargo-check:##
+cargo-c:## 	cargo-c
+	@type -P rustc || $(MAKE) rustup-install
 	cargo c
-install:cargo-install##
-cargo-install:##
+install:cargo-install## 	install
+cargo-i:## 	cargo-i
+	@type -P rustc || $(MAKE) rustup-install
 	cargo install --path .
+
 -include Makefile
+-include cargo.mk
 -include act.mk
