@@ -112,11 +112,32 @@ cargo-i:## 	cargo-i
 	@type -P rustc || $(MAKE) rustup-install
 	cargo install --path .
 
-test:
-##gnostr needs to be installed
-	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "gnostr://$(shell gnostr-weeble)/$(shell gnostr-blockheight)/$(shell gnostr-wobble)"
-##@bash -c "gnostr --envelope --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble)  --tag wobble $(shell gnostr-wobble)  --tag blockheight $(shell gnostr-blockheight) --content "$(shell gnostr-weeble)/$(shell gnostr-wobble)/$(shell gnostr-wobble)"" #| ./target/debug/gnostr-cat -u wss://nos.lol
+test:## 	test
+	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble))" | ./target/debug/gnostr-cat -u wss://nos.lol
+	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble)||$(shell gnostr-blockheight))" | ./target/debug/gnostr-cat -u wss://nos.lol
 
+nip-zero:## 	nip-zero
+	@gnostr \
+    --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) \
+    -t gnostr \
+    --tag weeble $(shell gnostr-blockheight) \
+    --tag wobble $(shell gnostr-wobble) \
+    --kind 0 \
+    --envelope \
+    --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
+  | gnostr-cat -u wss://nos.lol | jq .[1]
+nip-zero2:## 	nip-zero2
+	@gnostr \
+    --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) \
+    -t gnostr \
+    --tag weeble $(shell gnostr-blockheight) \
+    --tag wobble $(shell gnostr-wobble) \
+    --kind 0 \
+    --envelope \
+    --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
+  | gnostr-cat -u wss://relay.damus.io | jq .[1]
+nip-zero-roundtrip:## 	nip-0-roundtrip
+	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero) | sed 's/\"//g')) | gnostr-cat -u wss://nos.lol | jq
 -include Makefile
 -include cargo.mk
 -include act.mk
