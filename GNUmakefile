@@ -113,7 +113,9 @@ cargo-i:## 	cargo-i
 	cargo install --path .
 
 test:## 	test
+	@export weeble=$(shell gnostr-sha256 $(shell gnostr-weeble)) && echo $$weeble
 	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble))" | ./target/debug/gnostr-cat -u wss://nos.lol
+	@export weeble_blockheight=$(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) && echo $$weeble_blockheight
 	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble)||$(shell gnostr-blockheight))" | ./target/debug/gnostr-cat -u wss://nos.lol
 
 nip-zero-nos:## 	nip-zero-nos
