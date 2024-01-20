@@ -1,39 +1,33 @@
-##
-##make cargo-*
+## CARGO
 cargo-help:### 	cargo-help
 	@awk 'BEGIN {FS = ":.*?###"} /^[a-zA-Z_-]+:.*?###/ {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-cargo-build:### 	cargo build
-## 	make cargo-build q=true
-	@. $(HOME)/.cargo/env
-	@RUST_BACKTRACE=all cargo b $(QUIET)
-cargo-install:### 	cargo install --path .
-#@. $(HOME)/.cargo/env
-	#@cargo install --path $(PWD)
-	@cargo install --locked --path $(PWD)
-cargo-br:cargo-build-release### 	cargo-br
-## 	make cargo-br q=true
-cargo-build-release:### 	cargo-build-release
-## 	make cargo-build-release q=true
-	@. $(HOME)/.cargo/env
-	@cargo b $(QUIET) --profile=$(PROFILE)
-cargo-check:### 	cargo-check
-## cargo c
-	@. $(HOME)/.cargo/env
-	@cargo c
-cargo-bench:### 	cargo-bench
-## cargo b
-##	cargo build --release
-	@. $(HOME)/.cargo/env
-	@cargo bench
-cargo-test:### 	cargo-test
-## cargo t
-	@. $(HOME)/.cargo/env
-	@cargo test
-cargo-report:### 	cargo-report
-	@. $(HOME)/.cargo/env
-	cargo report future-incompatibilities --id 1
-cargo-doc:### 	cargo-doc
-	@cargo doc --no-deps --open
 
+cargo-install:### 	cargo install --path .
+## cargo install --locked --path `pwd`
+	@$(CARGO) install --locked --path $(PWD)
+
+cargo-bench:### 	cargo-bench
+## cargo bench
+	@$(CARGO) bench
+
+cargo-examples:### 	cargo-examples
+## cargo b --examples
+	@$(CARGO) b --examples
+
+cargo-report:### 	cargo-report
+## cargo report future-incompatibilities --id 1
+	$(CARGO) report future-incompatibilities --id 1
+
+cargo-doc:### 	cargo-doc
+## cargo doc
+## cargo doc --no-deps
+## cargo doc --no-deps --open
+	 $(CARGO) doc --no-deps #--open
+
+cargo-nightly-udeps:### 	cargo-nightly-udeps
+## cargo +nightly udeps
+	 $(CARGO) +nightly udeps
+
+## :
 # vim: set noexpandtab:
 # vim: set setfiletype make
