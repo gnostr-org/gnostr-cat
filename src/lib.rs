@@ -24,8 +24,8 @@ pub struct ServerResponse {
 }
 
 impl ServerResponse {
-    fn to_string(self: Self) -> String {
-        serde_json::to_string(&self).unwrap()
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 }
 
@@ -102,7 +102,7 @@ pub fn read_input() -> Vec<String> {
     for line in stdin.lock().lines() {
         lines.push(line.unwrap());
     }
-    return lines;
+    lines
 }
 
 pub async fn request(
@@ -111,7 +111,7 @@ pub async fn request(
     input: Vec<String>,
     config: Config,
 ) {
-    let url = match Url::parse(&url_str) {
+    let url = match Url::parse(url_str) {
         Ok(url) => url,
         Err(err) => {
             tx.send(Err(format!("Unable to parse websocket url: {}", err)))
