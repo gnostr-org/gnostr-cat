@@ -116,7 +116,7 @@ test:## 	test
 	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble))" | ./target/debug/gnostr-cat -u wss://nos.lol
 	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble)||$(shell gnostr-blockheight))" | ./target/debug/gnostr-cat -u wss://nos.lol
 
-nip-zero:## 	nip-zero
+nip-zero-nos:## 	nip-zero-nos
 	@gnostr \
     --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) \
     -t gnostr \
@@ -126,7 +126,7 @@ nip-zero:## 	nip-zero
     --envelope \
     --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
   | gnostr-cat -u wss://nos.lol | jq .[1]
-nip-zero2:## 	nip-zero2
+nip-zero-damus:## 	nip-zero-damus
 	@gnostr \
     --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) \
     -t gnostr \
@@ -136,8 +136,13 @@ nip-zero2:## 	nip-zero2
     --envelope \
     --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
   | gnostr-cat -u wss://relay.damus.io | jq .[1]
-nip-zero-roundtrip:## 	nip-0-roundtrip
-	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero) | sed 's/\"//g')) | gnostr-cat -u wss://nos.lol | jq
+
+nip-zero-roundtrip-nos:## 	nip-0-roundtrip
+	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero-nos) | sed 's/\"//g')) | gnostr-cat -u wss://nos.lol | jq
+
+nip-zero-roundtrip-damus:## 	nip-zero-roundtrip-damus
+	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero-nos) | sed 's/\"//g')) | gnostr-cat -u wss://relay.damus.io | jq
+
 -include Makefile
 -include cargo.mk
 -include act.mk
