@@ -118,9 +118,22 @@ test:## 	test
 	@export weeble_blockheight=$(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) && gnostr --sec $$weeble_blockheight -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble)||$(shell gnostr-blockheight))" | ./target/debug/gnostr-cat -u wss://nos.lol
 
 nip-zero-nos:## 	nip-zero-nos
-	@gnostr \
-    --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) \
+	@export weeble=$(shell gnostr-sha256 $(shell gnostr-weeble)) && \
+    gnostr \
+    --sec $$weeble \
     -t gnostr \
+    --tag weeble $(shell gnostr-weeble) \
+    --tag weeble $(shell gnostr-blockheight) \
+    --tag wobble $(shell gnostr-wobble) \
+    --kind 0 \
+    --envelope \
+    --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
+  | gnostr-cat -u wss://nos.lol | jq .[1]
+	@export weeble_blockheight=$(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) && \
+    gnostr \
+    --sec $$weeble_blockheight \
+    -t gnostr \
+    --tag weeble $(shell gnostr-weeble) \
     --tag weeble $(shell gnostr-blockheight) \
     --tag wobble $(shell gnostr-wobble) \
     --kind 0 \
@@ -128,15 +141,30 @@ nip-zero-nos:## 	nip-zero-nos
     --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
   | gnostr-cat -u wss://nos.lol | jq .[1]
 nip-zero-damus:## 	nip-zero-damus
-	@gnostr \
-    --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) \
+	@export weeble=$(shell gnostr-sha256 $(shell gnostr-weeble)) && \
+    gnostr \
+    --sec $$weeble \
     -t gnostr \
+    --tag weeble $(shell gnostr-weeble) \
     --tag weeble $(shell gnostr-blockheight) \
     --tag wobble $(shell gnostr-wobble) \
     --kind 0 \
     --envelope \
     --content "{\"content\":\"{\"name\":\"gnostr-weeble\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
-  | gnostr-cat -u wss://relay.damus.io | jq .[1]
+  | gnostr-cat -u wss://relay.damus.io | jq .[1] && \
+  echo $$weeble
+	@export weeble_blockheight=$(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) && \
+    gnostr \
+    --sec $$weeble_blockheight \
+    -t gnostr \
+    --tag weeble $(shell gnostr-weeble) \
+    --tag weeble $(shell gnostr-blockheight) \
+    --tag wobble $(shell gnostr-wobble) \
+    --kind 0 \
+    --envelope \
+    --content "{\"content\":\"{\"name\":\"gnostr-weeble_blockheight\",\"about\": \"#gnostr\\ngnostr-sha256 $(gnostr-weeble)$(gnostr-blockheight)\",\"picture\":\"https://avatars.githubusercontent.com/u/135379339?s=200&v=4\",\"nip05\":\"null\"}" \
+  | gnostr-cat -u wss://relay.damus.io | jq .[1] && \
+  echo $$weeble_blockheight
 
 nip-zero-roundtrip-nos:## 	nip-0-roundtrip
 	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero-nos) | sed 's/\"//g')) | gnostr-cat -u wss://nos.lol | jq
