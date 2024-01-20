@@ -112,6 +112,11 @@ cargo-i:## 	cargo-i
 	@type -P rustc || $(MAKE) rustup-install
 	cargo install --path .
 
+test:
+##gnostr needs to be installed
+	@gnostr --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "gnostr://$(shell gnostr-weeble)/$(shell gnostr-blockheight)/$(shell gnostr-wobble)"
+##@bash -c "gnostr --envelope --sec $(shell gnostr-sha256 $(shell gnostr-weeble)) -t gnostr --tag weeble $(shell gnostr-weeble)  --tag wobble $(shell gnostr-wobble)  --tag blockheight $(shell gnostr-blockheight) --content "$(shell gnostr-weeble)/$(shell gnostr-wobble)/$(shell gnostr-wobble)"" #| ./target/debug/gnostr-cat -u wss://nos.lol
+
 -include Makefile
 -include cargo.mk
 -include act.mk
