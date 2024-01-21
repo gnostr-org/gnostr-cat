@@ -88,6 +88,9 @@ export python_version_minor
 export python_version_patch
 export PYTHON_VERSION
 
+CARGO:=$(shell which cargo)
+export CARGO
+
 -:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?##/ {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 help:## 	help
