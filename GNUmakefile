@@ -104,6 +104,7 @@ rustup-install:## 	rustup-install
 cargo-b:## 	cargo-b
 	@type -P rustc || $(MAKE) rustup-install
 	cargo b
+cargo-build-release:cargo-b-release## 	cargo-build-release
 cargo-b-release:## 	cargo-b-release
 	@type -P rustc || $(MAKE) rustup-install
 	cargo build --release
