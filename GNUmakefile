@@ -116,10 +116,13 @@ cargo-i:## 	cargo-i
 	@type -P rustc || $(MAKE) rustup-install
 	cargo install --path .
 
-test:## 	test
+
+
+test-weeble:## 	test-weeble
 	@export weeble=$(shell gnostr-sha256 $(shell gnostr-weeble)) && \
-    gnostr --sec $$weeble -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble))" | ./target/debug/gnostr-cat -u wss://nos.lol
-	@export weeble_blockheight=$(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) && gnostr --sec $$weeble_blockheight -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble)||$(shell gnostr-blockheight))" | ./target/debug/gnostr-cat -u wss://nos.lol
+    gnostr --sec $$weeble -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble))" | gnostr-cat -u wss://nos.lol
+test-weeble-blockheight:## 	test-weeble-blckheight
+	@export weeble_blockheight=$(shell gnostr-sha256 $(shell gnostr-weeble)$(shell gnostr-blockheight)) && gnostr --sec $$weeble_blockheight -t gnostr --tag weeble $(shell gnostr-weeble) --envelope --content "sha256($(shell gnostr-weeble)||$(shell gnostr-blockheight))" | gnostr-cat -u wss://nos.lol
 
 nip-zero-nos-weeble:## 	nip-zero-nos-weeble
 	@export weeble=$(shell gnostr-sha256 $(shell gnostr-weeble)) && \
@@ -176,7 +179,7 @@ nip-zero-roundtrip-nos:## 	nip-0-roundtrip
 	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero-nos-weeble) | sed 's/\"//g')) | gnostr-cat -u wss://nos.lol | jq
 
 nip-zero-roundtrip-damus:## 	nip-zero-roundtrip-damus
-	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero-nos) | sed 's/\"//g')) | gnostr-cat -u wss://relay.damus.io | jq
+	@gnostr-query -i $(shell echo $(shell echo $(shell make nip-zero-nos-weeble) | sed 's/\"//g')) | gnostr-cat -u wss://relay.damus.io | jq
 
 -include Makefile
 -include cargo.mk
