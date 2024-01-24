@@ -1,9 +1,9 @@
 [package]
-name = "websocat"
-version = "1.12.0"
+name = "gnostr-cat"
+version = "0.0.6"
 authors = ["Vitaly \"_Vi\" Shukela <vi0oss@gmail.com>"]
 license = "MIT"
-repository = "https://github.com/vi/websocat"
+repository = "https://github.com/gnostr-org/gnostr-cat"
 description = "Command-line client for web sockets, like netcat/curl/socat for ws://."
 keywords = ["WebSocket", "socat", "rfc6455", "netcat", "cli"]
 include = ["src","Cargo.toml","LICENSE","README.md"]

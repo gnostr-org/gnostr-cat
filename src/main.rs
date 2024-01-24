@@ -3,7 +3,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(deprecated_cfg_attr))]
 
 #[macro_use]
-extern crate websocat;
+extern crate gnostr_cat;
 
 extern crate futures;
 extern crate tokio;
@@ -31,9 +31,9 @@ use std::net::{IpAddr, SocketAddr};
 
 use structopt::StructOpt;
 
-use websocat::options::StaticFile;
-use websocat::socks5_peer::{SocksHostAddr, SocksSocketAddr};
-use websocat::{Options, SpecifierClass, WebsocatConfiguration1};
+use gnostr_cat::options::StaticFile;
+use gnostr_cat::socks5_peer::{SocksHostAddr, SocksSocketAddr};
+use gnostr_cat::{Options, SpecifierClass, WebsocatConfiguration1};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -45,13 +45,13 @@ use std::ffi::OsString;
 Basic examples:
   Command-line websocket client:
     websocat ws://ws.vi-server.org/mirror/
-    
+
   WebSocket server
     websocat -s 8080
-    
+
   WebSocket-to-TCP proxy:
     websocat --binary ws-l:127.0.0.1:8080 tcp:127.0.0.1:5678
-    
+
 ",
     usage = "websocat ws://URL | wss://URL               (simple client)\n    websocat -s port                            (simple server)\n    websocat [FLAGS] [OPTIONS] <addr1> <addr2>  (advanced mode)"
 )]
@@ -386,7 +386,7 @@ struct Opt {
     #[structopt(
         long = "pkcs12-der",
         help = "Pkcs12 archive needed to accept SSL connections, certificate and key.\nA command to output it: openssl pkcs12 -export -out output.pkcs12 -inkey key.pem -in cert.pem\nUse with -s (--server-mode) option or with manually specified TLS overlays.\nSee moreexamples.md for more info.",
-        parse(try_from_os_str = "websocat::ssl_peer::interpret_pkcs12")
+        parse(try_from_os_str = "gnostr_cat::ssl_peer::interpret_pkcs12")
     )]
     pkcs12_der: Option<Vec<u8>>,
 
@@ -401,7 +401,7 @@ struct Opt {
     #[structopt(
         long = "client-pkcs12-der",
         help = "[A] Client identity TLS certificate",
-        parse(try_from_os_str = "websocat::ssl_peer::interpret_pkcs12")
+        parse(try_from_os_str = "gnostr_cat::ssl_peer::interpret_pkcs12")
     )]
     client_pkcs12_der: Option<Vec<u8>>,
 
@@ -431,7 +431,7 @@ struct Opt {
     /// Drop WebSocket connection if Pong message not received for this number of seconds
     #[structopt(long = "ping-timeout")]
     ws_ping_timeout: Option<u64>,
-    
+
     /// [A] Just a Sec-WebSocket-Key value without running main Websocat
     #[structopt(long = "just-generate-key")]
     just_generate_key: bool,
@@ -451,7 +451,7 @@ struct Opt {
 
     /// [A] Specify HTTP request headers for `http-request:` specifier.
     #[structopt(
-        long = "request-header", 
+        long = "request-header",
         parse(try_from_str = "interpret_custom_header2"),
     )]
     request_headers: Vec<(http::header::HeaderName, http::header::HeaderValue)>,
@@ -467,7 +467,7 @@ struct Opt {
     /// usage of zero-len message as EOF flag inside Websocat.
     #[structopt(long = "websocket-ignore-zeromsg")]
     websocket_ignore_zeromsg: bool,
-    
+
     /// Maximum number of messages to copy in one direction.
     #[structopt(long = "max-messages")]
     max_messages: Option<usize>,
@@ -486,7 +486,7 @@ struct Opt {
     /// them as text even if `--binary` is specified
     #[structopt(long = "--text-prefix")]
     pub ws_text_prefix: Option<String>,
-    
+
     /// [A] Prepend specified text to each received WebSocket binary message.
     /// Also strip this prefix from outgoing messages, explicitly marking
     /// them as binary even if `--text` is specified
@@ -518,7 +518,7 @@ struct Opt {
     #[structopt(long = "--async-stdio")]
     pub asyncstdio: bool,
 
-    /// [A] Inhibit using stdin/stdout in a nonblocking way if it is not a tty 
+    /// [A] Inhibit using stdin/stdout in a nonblocking way if it is not a tty
     #[structopt(long = "--no-async-stdio")]
     pub noasyncstdio: bool,
 
@@ -544,7 +544,7 @@ struct Opt {
 
     /// [A] Specify encryption/decryption key for `crypto:` specifier. Requires `base64:`, `file:` or `pwd:` prefix.
     #[cfg(feature = "crypto_peer")]
-    #[structopt(long = "crypto-key", parse(try_from_str = "websocat::crypto_peer::interpret_opt"))]
+    #[structopt(long = "crypto-key", parse(try_from_str = "gnostr_cat::crypto_peer::interpret_opt"))]
     pub crypto_key: Option<[u8; 32]>,
 
     /// [A] Swap encryption and decryption operations in `crypto:` specifier - encrypt on read, decrypto on write.
@@ -604,52 +604,52 @@ struct Opt {
     /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_a`.
     /// Format is `symbol@library_file`. If `symbol@` is omitted, `websocat_transform` is implied.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-a",  parse(try_from_str = "websocat::transform_peer::load_symbol"))]
-    pub native_transform_a: Option<websocat::transform_peer::Sym>,
+    #[structopt(long = "native-plugin-a",  parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    pub native_transform_a: Option<gnostr_cat::transform_peer::Sym>,
 
     /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_b`.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-b", parse(try_from_str = "websocat::transform_peer::load_symbol"))]
-    pub native_transform_b: Option<websocat::transform_peer::Sym>,
+    #[structopt(long = "native-plugin-b", parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    pub native_transform_b: Option<gnostr_cat::transform_peer::Sym>,
 
     /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_c`.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-c", parse(try_from_str = "websocat::transform_peer::load_symbol"))]
-    pub native_transform_c: Option<websocat::transform_peer::Sym>,
+    #[structopt(long = "native-plugin-c", parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    pub native_transform_c: Option<gnostr_cat::transform_peer::Sym>,
 
     /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_d`.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-d", parse(try_from_str = "websocat::transform_peer::load_symbol"))]
-    pub native_transform_d: Option<websocat::transform_peer::Sym>,
+    #[structopt(long = "native-plugin-d", parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    pub native_transform_d: Option<gnostr_cat::transform_peer::Sym>,
 
     /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_a:`.
     /// Format is `symbol@library_file`. If `symbol@` is omitted, `websocat_transform` is implied.
     /// The wasm module should also have `malloc` and `free` functions exposed.
     /// Prepend `library_file` with `!` to load serialized cwasm produced by `wasmtime compile` instead of compining the module in Websocat.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-a",  parse(try_from_str = "websocat::wasm_transform_peer::load_symbol"))]
-    pub wasm_transform_a: Option<websocat::wasm_transform_peer::Handle>,
+    #[structopt(long = "wasm-plugin-a",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    pub wasm_transform_a: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
     /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_b:`.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-b",  parse(try_from_str = "websocat::wasm_transform_peer::load_symbol"))]
-    pub wasm_transform_b: Option<websocat::wasm_transform_peer::Handle>,
+    #[structopt(long = "wasm-plugin-b",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    pub wasm_transform_b: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
     /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_c:`.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-c",  parse(try_from_str = "websocat::wasm_transform_peer::load_symbol"))]
-    pub wasm_transform_c: Option<websocat::wasm_transform_peer::Handle>,
+    #[structopt(long = "wasm-plugin-c",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    pub wasm_transform_c: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
     /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_d:`.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-d",  parse(try_from_str = "websocat::wasm_transform_peer::load_symbol"))]
-    pub wasm_transform_d: Option<websocat::wasm_transform_peer::Handle>,
+    #[structopt(long = "wasm-plugin-d",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    pub wasm_transform_d: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
     /// [A] Omit `jsonrpc` field when using `--jsonrpc`, e.g. for Chromium
     #[structopt(long = "jsonrpc-omit-jsonrpc")]
     pub jsonrpc_omit_jsonrpc: bool,
 
-    /// [A] Stop replying to incoming WebSocket pings after specified number of replies 
+    /// [A] Stop replying to incoming WebSocket pings after specified number of replies
     #[structopt(long = "inhibit-pongs")]
     pub inhibit_pongs: Option<usize>,
 
@@ -1009,7 +1009,7 @@ fn run() -> Result<()> {
                     eprintln!("Warning: all dashless arguments after -p or -P are considered part of the preamble. You may want to move -p/-P to the end of the command line.")
                 }
             }
-            return Err("No URL specified. Use `websocat --help` to show the help message.")?;
+            return Err("No URL specified. Use `gnostr-cat --help` to show the help message.")?;
         }
         (Some(cmds1), Some(cmds2)) => {
             // Advanced mode
@@ -1072,10 +1072,10 @@ fn run() -> Result<()> {
     };
 
     if opts.websocket_text_mode {
-        opts.read_debt_handling = websocat::readdebt::DebtHandling::Warn;
+        opts.read_debt_handling = gnostr_cat::readdebt::DebtHandling::Warn;
     }
     if cmd.strict_mode {
-        opts.read_debt_handling = websocat::readdebt::DebtHandling::DropMessage;
+        opts.read_debt_handling = gnostr_cat::readdebt::DebtHandling::DropMessage;
         opts.linemode_strict = true;
     }
 
@@ -1110,7 +1110,7 @@ fn run() -> Result<()> {
         websocat2
             .s1
             .overlays
-            .insert(0, websocat::specifier::SpecifierNode{cls: ::std::rc::Rc::new(websocat::jsonrpc_peer::JsonRpcClass)});
+            .insert(0, gnostr_cat::specifier::SpecifierNode{cls: ::std::rc::Rc::new(gnostr_cat::jsonrpc_peer::JsonRpcClass)});
     }
     debug!("Done third phase of interpreting options.");
     let websocat = websocat2.parse2()?;
