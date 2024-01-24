@@ -62,6 +62,10 @@ jobs:
         run: |
           cargo install gnostr-bins
 
+      - name: cargo install gnostr-sha256
+        run: |
+          cargo install gnostr-sha256
+
       - name: cargo-c
         run: |
           make cargo-c
