@@ -1,4 +1,4 @@
-extern crate websocat;
+extern crate gnostr_cat;
 
 extern crate env_logger;
 extern crate futures;
@@ -7,7 +7,7 @@ extern crate tokio_timer;
 
 use futures::future::Future;
 
-use websocat::{spec, Options, WebsocatConfiguration3};
+use gnostr_cat::{spec, Options, WebsocatConfiguration3};
 
 fn dflt() -> Options {
     Default::default()
