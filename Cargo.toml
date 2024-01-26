@@ -1,11 +1,11 @@
 [package]
 name = "gnostr-cat"
 version = "0.0.6"
-authors = ["Vitaly \"_Vi\" Shukela <vi0oss@gmail.com>"]
+authors = ["gnostr <admin@gnostr.org>", "Vitaly \"_Vi\" Shukela <vi0oss@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/gnostr-org/gnostr-cat"
 description = "Command-line client for web sockets, like netcat/curl/socat for ws://."
-keywords = ["WebSocket", "socat", "rfc6455", "netcat", "cli"]
+keywords = ["WebSocket", "socat", "rfc6455", "netcat", "cli", "nostr", "gnostr"]
 include = ["src","Cargo.toml","LICENSE","README.md"]
 readme = "README.md"
 edition = "2018"
