@@ -17,14 +17,17 @@ on:
       - 'master'
       - 'main'
 
+env:
+  CARGO_TERM_COLOR: always
+
   workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  ubuntu-build_and_test:
+  build:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: styfle/cancel-workflow-action@0.11.0
@@ -53,10 +56,10 @@ jobs:
       - name: install rustup
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source "$HOME/.cargo/env"
 
-      - name: sudo apt-get install -y make
+      - name: sudo apt-get install -y make || brew install make
         run: |
           printenv && sudo apt-get update && \
-          sudo apt-get install -y make
+          sudo apt-get install -y make || brew install make
 
       - name: cargo install gnostr-bins
         run: |
