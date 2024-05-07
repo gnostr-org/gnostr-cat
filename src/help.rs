@@ -94,7 +94,10 @@ pub fn shorthelp() {
     list_of_all_specifier_classes!(my);
 
     println!("See more address types with the --help=long option.");
-    println!("See short examples and --dump-spec names for most address types and overlays with --help=doc option");
+    println!(
+        "See short examples and --dump-spec names for most address types and overlays with \
+         --help=doc option"
+    );
 }
 
 pub fn longhelp() {
@@ -156,7 +159,8 @@ fn specdoc(sc: &dyn SpecifierClass, overlays: bool) {
 }
 
 pub fn dochelp() {
-    println!(r#"
+    println!(
+        r#"
 # Websocat Reference (in progress)
 
 Websocat has many command-line options and special format for positional arguments.
@@ -186,7 +190,8 @@ Some address types may be "aliases" to other address types or combinations of ov
 
 
 ```
-"#);
+"#
+    );
 
     let mut a = Opt::clap();
 

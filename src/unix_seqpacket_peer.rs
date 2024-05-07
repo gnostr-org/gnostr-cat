@@ -1,13 +1,15 @@
 extern crate tokio_reactor;
 
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+
+use futures::Stream;
+
 use super::{
     futures, libc, multi, once, peer_err_s, simple_err, BoxedNewPeerFuture, BoxedNewPeerStream,
     ConstructParams, MyUnixStream, Options, Peer, PeerConstructor, Specifier, UnixListener,
     UnixStream,
 };
-use futures::Stream;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct SeqpacketConnect(pub PathBuf);
@@ -80,12 +82,13 @@ Example: forward connections from a UNIX seqpacket socket to a WebSocket
 
 pub fn seqpacket_connect_peer(addr: &Path) -> BoxedNewPeerFuture {
     fn getfd(addr: &Path) -> Option<i32> {
+        use std::mem::size_of;
+        use std::os::unix::ffi::OsStrExt;
+
         use self::libc::{
             c_char, close, connect, sa_family_t, sockaddr_un, socket, socklen_t, AF_UNIX,
             SOCK_SEQPACKET,
         };
-        use std::mem::size_of;
-        use std::os::unix::ffi::OsStrExt;
         unsafe {
             let s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
             if s == -1 {
@@ -123,7 +126,7 @@ pub fn seqpacket_connect_peer(addr: &Path) -> BoxedNewPeerFuture {
             Ok(Peer::new(
                 MyUnixStream(x.clone(), true),
                 MyUnixStream(x.clone(), false),
-                None /* TODO*/ ,
+                None, /* TODO */
             ))
         } else {
             Err("Failed to get or connect socket")?
@@ -134,12 +137,13 @@ pub fn seqpacket_connect_peer(addr: &Path) -> BoxedNewPeerFuture {
 
 pub fn seqpacket_listen_peer(addr: &Path, opts: &Rc<Options>) -> BoxedNewPeerStream {
     fn getfd(addr: &Path, opts: &Rc<Options>) -> Option<i32> {
+        use std::mem::size_of;
+        use std::os::unix::ffi::OsStrExt;
+
         use self::libc::{
             bind, c_char, close, listen, sa_family_t, sockaddr_un, socket, socklen_t, unlink,
             AF_UNIX, SOCK_SEQPACKET,
         };
-        use std::mem::size_of;
-        use std::os::unix::ffi::OsStrExt;
         unsafe {
             let s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
             if s == -1 {
@@ -177,10 +181,14 @@ pub fn seqpacket_listen_peer(addr: &Path, opts: &Rc<Options>) -> BoxedNewPeerStr
                 }
             }
             if opts.announce_listens {
-                // too lazy to actually handle '"@'  vs '@"' here - is seqpacket even used by somebody around?
+                // too lazy to actually handle '"@'  vs '@"' here - is seqpacket even used by
+                // somebody around?
                 let s = format!("LISTEN proto=unix_seqpacket,path={:?}", addr);
                 if s.contains("path=\"@") {
-                    warn!("that particular LISTEN line format should be changed in future Websocat version");
+                    warn!(
+                        "that particular LISTEN line format should be changed in future Websocat \
+                         version"
+                    );
                 }
                 println!("{}", s);
             }
@@ -208,7 +216,7 @@ pub fn seqpacket_listen_peer(addr: &Path, opts: &Rc<Options>) -> BoxedNewPeerStr
                 Peer::new(
                     MyUnixStream(x.clone(), true),
                     MyUnixStream(x.clone(), false),
-                    None /* TODO*/ ,
+                    None, /* TODO */
                 )
             })
             .map_err(|()| crate::simple_err2("unreachable error?")),

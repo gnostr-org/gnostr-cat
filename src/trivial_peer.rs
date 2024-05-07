@@ -1,20 +1,16 @@
-use super::{BoxedNewPeerFuture, Peer};
-
-use futures;
-use rand::RngCore;
-use std;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
+use std::io::{Read, Result as IoResult, Write};
+use std::rc::Rc;
 
 use futures::Async::Ready;
-
-use std::rc::Rc;
+use rand::RngCore;
 use tokio_io::{AsyncRead, AsyncWrite};
+use {futures, std};
 
 use super::readdebt::{DebtHandling, ReadDebt, ZeroMessagesHandling};
-use super::wouldblock;
-
-use super::{once, simple_err, ConstructParams, PeerConstructor, Specifier};
+use super::{
+    once, simple_err, wouldblock, BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor,
+    Specifier,
+};
 
 #[derive(Clone)]
 pub struct Literal(pub Vec<u8>);
@@ -154,7 +150,8 @@ pub fn get_assert2_peer(b: Vec<u8>) -> BoxedNewPeerFuture {
     let p = Peer::new(r, w, None);
     Box::new(futures::future::ok(p)) as BoxedNewPeerFuture
 }
-/// A special peer that returns NotReady without registering for any wakeup, deliberately hanging all connections forever.
+/// A special peer that returns NotReady without registering for any wakeup,
+/// deliberately hanging all connections forever.
 pub fn get_clogged_peer() -> BoxedNewPeerFuture {
     let r = CloggedPeer;
     let w = CloggedPeer;
@@ -242,7 +239,6 @@ impl Read for CloggedPeer {
     }
 }
 
-
 // TODO: make Prepend{Read,Write} available from command line
 
 /// First read content of `header`, then start relaying from `inner`.
@@ -263,7 +259,7 @@ impl Read for PrependRead {
         let l = buf.len().min(self.remaining);
         debug!("PrependRead read debt {}", l);
         let offset = self.header.len() - self.remaining;
-        buf[..l].copy_from_slice(&self.header[offset..(offset+l)]);
+        buf[..l].copy_from_slice(&self.header[offset..(offset + l)]);
         let ret = l;
         self.remaining -= ret;
         if self.remaining == 0 {
@@ -312,7 +308,11 @@ impl<T: Specifier> Specifier for Log<T> {
     fn construct(&self, cp: ConstructParams) -> PeerConstructor {
         let inner = self.0.construct(cp.clone());
         inner.map(move |p, _l2r| {
-            Box::new(futures::future::ok(Peer(Box::new(LogRead(p.0)), Box::new(LogWrite(p.1)), p.2)))
+            Box::new(futures::future::ok(Peer(
+                Box::new(LogRead(p.0)),
+                Box::new(LogWrite(p.1)),
+                p.2,
+            )))
         })
     }
     specifier_boilerplate!(noglobalstate has_subspec);
@@ -338,17 +338,16 @@ Example: view WebSocket handshake and traffic on the way to echo.websocket.org
 "#
 );
 
-pub struct LogRead (pub Box<dyn AsyncRead>);
+pub struct LogRead(pub Box<dyn AsyncRead>);
 
 fn log_buffer(tag: &'static str, buf: &[u8]) {
-    let mut s = String::with_capacity(buf.len()*2);
+    let mut s = String::with_capacity(buf.len() * 2);
     for x in buf.iter().cloned().map(std::ascii::escape_default) {
-        s.push_str(String::from_utf8_lossy(&x.collect::<Vec<u8>>()).as_ref() );
+        s.push_str(String::from_utf8_lossy(&x.collect::<Vec<u8>>()).as_ref());
     }
-    eprintln!("{} {} \"{}\"", tag, buf.len(), s );
+    eprintln!("{} {} \"{}\"", tag, buf.len(), s);
     debug!("{}", hex::encode(buf));
 }
-
 
 impl AsyncRead for LogRead {}
 
@@ -376,7 +375,6 @@ impl AsyncWrite for LogWrite {
 }
 impl Write for LogWrite {
     fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
-        
         let ret = self.0.write(buf);
 
         if let Ok(ref sz) = ret {
@@ -392,7 +390,6 @@ impl Write for LogWrite {
         self.0.flush()
     }
 }
-
 
 #[derive(Debug)]
 pub struct Random;
@@ -421,9 +418,7 @@ Generate random bytes when being read from, discard written bytes.
 "#
 );
 
-
-pub struct RandomReader ();
-
+pub struct RandomReader();
 
 impl AsyncRead for RandomReader {}
 
@@ -434,18 +429,21 @@ impl Read for RandomReader {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ExitOnSpecificByte<T: Specifier>(pub T);
 impl<T: Specifier> Specifier for ExitOnSpecificByte<T> {
     fn construct(&self, cp: ConstructParams) -> PeerConstructor {
         let inner = self.0.construct(cp.clone());
         inner.map(move |p, _l2r| {
-            Box::new(futures::future::ok(Peer(Box::new(ExitOnSpecificByteReader { 
-                inner: p.0,
-                the_byte: cp.program_options.byte_to_exit_on,
-                eof_triggered: false,
-            }), p.1, p.2)))
+            Box::new(futures::future::ok(Peer(
+                Box::new(ExitOnSpecificByteReader {
+                    inner: p.0,
+                    the_byte: cp.program_options.byte_to_exit_on,
+                    eof_triggered: false,
+                }),
+                p.1,
+                p.2,
+            )))
         })
     }
     specifier_boilerplate!(noglobalstate has_subspec);
@@ -470,12 +468,11 @@ Example: `(stty raw -echo; websocat -b exit_on_specific_byte:stdio tcp:127.0.0.1
 "#
 );
 
-pub struct ExitOnSpecificByteReader { 
+pub struct ExitOnSpecificByteReader {
     inner: Box<dyn AsyncRead>,
     the_byte: u8,
     eof_triggered: bool,
 }
-
 
 impl AsyncRead for ExitOnSpecificByteReader {}
 
@@ -488,14 +485,13 @@ impl Read for ExitOnSpecificByteReader {
 
         if let Ok(ref sz) = ret {
             let buf = &buf[..*sz];
-            if let Some((pos,_)) = buf.iter().enumerate().find(|x|*x.1==self.the_byte) {
+            if let Some((pos, _)) = buf.iter().enumerate().find(|x| *x.1 == self.the_byte) {
                 log::info!("Special byte detected. Triggering EOF.");
                 self.eof_triggered = true;
                 return Ok(pos);
-            }   
+            }
         }
 
         ret
     }
 }
-

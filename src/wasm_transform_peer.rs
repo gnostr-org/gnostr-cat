@@ -1,26 +1,19 @@
-use futures::future::ok;
-use wasmtime::{Module, Linker, Memory, Caller, TypedFunc};
-
 use std::collections::HashMap;
+use std::io::{Error as IoError, Read};
 use std::rc::Rc;
 use std::sync::atomic::AtomicU32;
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
 
-use crate::peer_strerr;
-
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::Read;
+use futures::future::ok;
 use tokio_io::AsyncRead;
+use wasmtime::{Caller, Linker, Memory, Module, TypedFunc};
 
-use std::io::Error as IoError;
-
-
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
+use crate::peer_strerr;
 
 #[derive(Default)]
 struct Env {
-    store: wasmtime::Store::<()>,
+    store: wasmtime::Store<()>,
     modules: HashMap<String, wasmtime::Instance>,
 }
 
@@ -106,56 +99,70 @@ declare_wasm_transform_class!(
     "[A] Same as `wasm_plugin_transform_a`, but for other plugin slot.",
 );
 
-
 pub fn load_symbol(spec: &str) -> crate::Result<Handle> {
     let mut env = ENV.lock().unwrap();
     let env = env.get_or_insert_with(Default::default);
-    
-    let (libname, symname) =
-    if let Some((before, after)) = spec.split_once('@') {
+
+    let (libname, symname) = if let Some((before, after)) = spec.split_once('@') {
         (after, before)
     } else {
         (spec, "websocat_transform")
     };
-    
+
     let instance = match env.modules.entry(libname.to_owned()) {
         std::collections::hash_map::Entry::Occupied(x) => x.into_mut(),
         std::collections::hash_map::Entry::Vacant(x) => {
-            let module = if libname.starts_with('!') {
-                info!("Loading pre-built wasm module {}", &libname[1..]);
-                unsafe { Module::deserialize_file(env.store.engine(), &libname[1..])? }
-            } else {
-                #[cfg(feature="wasm_compiler")] {
-                    info!("Compiling wasm module {}", libname);
-                    Module::from_file(env.store.engine(), libname)?
-                }
-                #[cfg(not(feature="wasm_compiler"))] {
-                    return Err("Compiling wasm modules is not enabled in this Websocat build. Pre-compile them using `wasmtime compile`, then specify as `!myfilename.cwasm`")?;
-                }
-            };
-            
+            let module =
+                if libname.starts_with('!') {
+                    info!("Loading pre-built wasm module {}", &libname[1..]);
+                    unsafe { Module::deserialize_file(env.store.engine(), &libname[1..])? }
+                } else {
+                    #[cfg(feature = "wasm_compiler")]
+                    {
+                        info!("Compiling wasm module {}", libname);
+                        Module::from_file(env.store.engine(), libname)?
+                    }
+                    #[cfg(not(feature = "wasm_compiler"))]
+                    {
+                        return Err("Compiling wasm modules is not enabled in this Websocat \
+                                    build. Pre-compile them using `wasmtime compile`, then \
+                                    specify as `!myfilename.cwasm`")?;
+                    }
+                };
+
             let mut linker = Linker::<()>::new(env.store.engine());
             let mem_cell = Arc::new(Mutex::new(None::<Memory>));
             let mem_cell2 = mem_cell.clone();
-            linker.func_wrap("env", "websocat_log", move |c: Caller<()>, severity: i32, buffer: u32, mut len: u32| {
-                if len > 4096 {
-                    len = 4096;
-                }
-                let mut buf = vec![0u8; len as usize]; 
-                mem_cell2.lock().unwrap().unwrap().read(c, buffer as usize, &mut buf[..]).unwrap();
+            linker.func_wrap(
+                "env",
+                "websocat_log",
+                move |c: Caller<()>, severity: i32, buffer: u32, mut len: u32| {
+                    if len > 4096 {
+                        len = 4096;
+                    }
+                    let mut buf = vec![0u8; len as usize];
+                    mem_cell2
+                        .lock()
+                        .unwrap()
+                        .unwrap()
+                        .read(c, buffer as usize, &mut buf[..])
+                        .unwrap();
 
-                let level = match severity {
-                    x if x<=1 => log::Level::Error,
-                    2 => log::Level::Warn,
-                    3 => log::Level::Info,
-                    4 => log::Level::Debug,
-                    _ => log::Level::Trace,
-                };
-                log::log!(level, "{}", std::string::String::from_utf8_lossy(&buf[..]));
-            })?;
-        
+                    let level = match severity {
+                        x if x <= 1 => log::Level::Error,
+                        2 => log::Level::Warn,
+                        3 => log::Level::Info,
+                        4 => log::Level::Debug,
+                        _ => log::Level::Trace,
+                    };
+                    log::log!(level, "{}", std::string::String::from_utf8_lossy(&buf[..]));
+                },
+            )?;
+
             let instance = linker.instantiate(&mut env.store, &module).unwrap();
-            let mem = instance.get_memory(&mut env.store, "memory").ok_or_else(||"no memory")?;
+            let mem = instance
+                .get_memory(&mut env.store, "memory")
+                .ok_or_else(|| "no memory")?;
             *mem_cell.lock().unwrap() = Some(mem);
             debug!("Wasm module loaded successfully");
             x.insert(instance)
@@ -163,12 +170,15 @@ pub fn load_symbol(spec: &str) -> crate::Result<Handle> {
     };
 
     debug!("Instantiating {}", spec);
-    let mem = instance.get_memory(&mut env.store, "memory").ok_or_else(||"no memory")?;
-    let transform = instance.get_typed_func::<(u32, u32, u32, u32, u32), u32, _>(&mut env.store, symname)?;
+    let mem = instance
+        .get_memory(&mut env.store, "memory")
+        .ok_or_else(|| "no memory")?;
+    let transform =
+        instance.get_typed_func::<(u32, u32, u32, u32, u32), u32, _>(&mut env.store, symname)?;
     let malloc = instance.get_typed_func::<u32, u32, _>(&mut env.store, "malloc")?;
     let free = instance.get_typed_func::<u32, (), _>(&mut env.store, "free")?;
     debug!("Instantiated");
-    
+
     let h = Handle {
         mem,
         malloc,
@@ -187,10 +197,9 @@ pub fn transform_peer(inner_peer: Peer, s: Option<Handle>) -> BoxedNewPeerFuture
     let conn_seqn = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let s = s.unwrap();
 
-
     let mut env = ENV.lock().unwrap();
     let env = env.as_mut().unwrap();
-    
+
     if let Err(_e) = s.transform.call(&mut env.store, (0, 0, 0, conn_seqn, 0)) {
         return peer_strerr("Failed to call symbol from wasm module");
     }
@@ -205,7 +214,6 @@ pub fn transform_peer(inner_peer: Peer, s: Option<Handle>) -> BoxedNewPeerFuture
     };
     let thepeer = Peer::new(filtered_r, inner_peer.1, inner_peer.2);
 
-
     Box::new(ok(thepeer)) as BoxedNewPeerFuture
 }
 
@@ -219,8 +227,7 @@ struct TransformPeer {
 }
 
 impl TransformPeer {
-    fn transform(&mut self, b: &mut [u8], l:u32, mut n:u32) -> crate::Result<u32> {
-
+    fn transform(&mut self, b: &mut [u8], l: u32, mut n: u32) -> crate::Result<u32> {
         let mut env = ENV.lock().unwrap();
         let env = env.as_mut().unwrap();
 
@@ -237,13 +244,20 @@ impl TransformPeer {
             warn!("Trimming message to be processed in wasm due to larger read than expected");
             n = self.buf_cap;
         }
-        self.sym.mem.write(&mut env.store, self.buf as usize, &b[0..(n as usize)])?;
-        let mut k = self.sym.transform.call(&mut env.store, (self.buf, n, self.buf_cap, self.conn_seqn, self.seqn))?;
+        self.sym
+            .mem
+            .write(&mut env.store, self.buf as usize, &b[0..(n as usize)])?;
+        let mut k = self.sym.transform.call(
+            &mut env.store,
+            (self.buf, n, self.buf_cap, self.conn_seqn, self.seqn),
+        )?;
         if k > self.buf_cap || k > l {
             warn!("Invalid return value from wasm transform function");
             k = self.buf_cap.min(l);
         }
-        self.sym.mem.read(&mut env.store, self.buf as usize, &mut b[0..(k as usize)])?;
+        self.sym
+            .mem
+            .read(&mut env.store, self.buf as usize, &mut b[0..(k as usize)])?;
 
         Ok(k)
     }
@@ -280,7 +294,10 @@ impl Drop for TransformPeer {
     fn drop(&mut self) {
         let mut env = ENV.lock().unwrap();
         let env = env.as_mut().unwrap();
-        let _ = self.sym.transform.call(&mut env.store, (0, 0, 0, self.conn_seqn, self.seqn));
+        let _ = self
+            .sym
+            .transform
+            .call(&mut env.store, (0, 0, 0, self.conn_seqn, self.seqn));
         if self.buf != 0 {
             let _ = self.sym.free.call(&mut env.store, self.buf);
             self.buf = 0;

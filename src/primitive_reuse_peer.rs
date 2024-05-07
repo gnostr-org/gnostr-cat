@@ -1,18 +1,16 @@
 extern crate futures;
 extern crate tokio_io;
 
-use futures::future::ok;
 use std::cell::RefCell;
+use std::io::{Error as IoError, Read, Write};
+use std::ops::DerefMut;
 use std::rc::Rc;
 
-use super::{BoxedNewPeerFuture, Peer};
-
-use std::io::{Error as IoError, Read, Write};
+use futures::future::ok;
+use futures::Future;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use super::{once, ConstructParams, PeerConstructor, Specifier};
-use futures::Future;
-use std::ops::DerefMut;
+use super::{once, BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
 
 #[derive(Debug)]
 pub struct Reuser(pub Rc<dyn Specifier>);

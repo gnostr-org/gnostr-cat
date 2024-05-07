@@ -1,25 +1,21 @@
+extern crate base64;
 extern crate tokio_codec;
 extern crate websocket;
-extern crate base64;
+
+use std::cell::RefCell;
+use std::io::{Read, Result as IoResult, Write};
+use std::rc::Rc;
+
+use futures::sink::Sink;
+use futures::stream::Stream;
+use futures::Async::{NotReady, Ready};
+use tokio_io::{AsyncRead, AsyncWrite};
+use {futures, std};
 
 use self::websocket::stream::r#async::Stream as WsStream;
 use self::websocket::OwnedMessage;
-use futures;
-use futures::sink::Sink;
-use futures::stream::Stream;
-use std;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
-use tokio_io::{AsyncRead, AsyncWrite};
-
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use futures::Async::{NotReady, Ready};
-
-use super::{brokenpipe, io_other_error, wouldblock, Peer, HupToken};
-
 use super::readdebt::{ProcessMessageResult, ReadDebt};
+use super::{brokenpipe, io_other_error, wouldblock, HupToken, Peer};
 
 type MultiProducerWsSink<T> = Rc<
     RefCell<
@@ -32,7 +28,7 @@ type WsSource<T> = futures::stream::SplitStream<
     tokio_codec::Framed<T, websocket::r#async::MessageCodec<websocket::OwnedMessage>>,
 >;
 
-#[derive(Copy,Clone,PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum CompressionMethod {
     None,
     Deflate,
@@ -41,14 +37,14 @@ pub enum CompressionMethod {
 }
 
 impl CompressionMethod {
-    #[cfg(feature="compression")]
+    #[cfg(feature = "compression")]
     fn uncompress(&self, x: Vec<u8>) -> Vec<u8> {
         if self == &CompressionMethod::None {
             return x;
         }
 
         let l = x.len();
-        let mut y = Vec::with_capacity(l*2);
+        let mut y = Vec::with_capacity(l * 2);
         match self {
             CompressionMethod::None => unreachable!(),
             CompressionMethod::Gzip => {
@@ -69,7 +65,7 @@ impl CompressionMethod {
                     }
                 }
             }
-            CompressionMethod::Zlib =>{
+            CompressionMethod::Zlib => {
                 let mut t = flate2::read::ZlibDecoder::new(std::io::Cursor::new(x));
                 match t.read_to_end(&mut y) {
                     Ok(_) => (),
@@ -83,15 +79,14 @@ impl CompressionMethod {
         y
     }
 
-
-    #[cfg(feature="compression")]
+    #[cfg(feature = "compression")]
     fn compress(&self, x: Vec<u8>) -> Vec<u8> {
         if self == &CompressionMethod::None {
             return x;
         }
 
         let l = x.len();
-        let mut y = Vec::with_capacity(l+64);
+        let mut y = Vec::with_capacity(l + 64);
         let c = flate2::Compression::new(6);
         match self {
             CompressionMethod::None => unreachable!(),
@@ -113,7 +108,7 @@ impl CompressionMethod {
                     }
                 }
             }
-            CompressionMethod::Zlib =>{
+            CompressionMethod::Zlib => {
                 let mut t = flate2::read::ZlibEncoder::new(std::io::Cursor::new(x), c);
                 match t.read_to_end(&mut y) {
                     Ok(_) => (),
@@ -127,7 +122,7 @@ impl CompressionMethod {
         y
     }
 
-    #[cfg(not(feature="compression"))]
+    #[cfg(not(feature = "compression"))]
     fn uncompress(&self, x: Vec<u8>) -> Vec<u8> {
         if self == &CompressionMethod::None {
             return x;
@@ -137,7 +132,7 @@ impl CompressionMethod {
         vec![]
     }
 
-    #[cfg(not(feature="compression"))]
+    #[cfg(not(feature = "compression"))]
     fn compress(&self, x: Vec<u8>) -> Vec<u8> {
         if self == &CompressionMethod::None {
             return x;
@@ -162,7 +157,7 @@ pub struct WsReadWrapper<T: WsStream + 'static> {
     pub creation_time: ::std::time::Instant, // for measuring ping RTTs
     pub print_rtts: bool,
     pub inhibit_pongs: Option<usize>,
-    pub uncompress : CompressionMethod,
+    pub uncompress: CompressionMethod,
 }
 
 impl<T: WsStream + 'static> AsyncRead for WsReadWrapper<T> {}
@@ -180,7 +175,12 @@ impl<T: WsStream + 'static> Read for WsReadWrapper<T> {
                 brokenpipe()
             }};
         }
-        fn process_prefixes_and_base64<'a>(qbuf :&'a mut Vec<u8>, q: &mut &'a [u8], prefix: &Option<String>, base64: bool) {
+        fn process_prefixes_and_base64<'a>(
+            qbuf: &'a mut Vec<u8>,
+            q: &mut &'a [u8],
+            prefix: &Option<String>,
+            base64: bool,
+        ) {
             match (prefix, base64) {
                 (None, false) => (),
                 (Some(pr), false) => {
@@ -197,16 +197,16 @@ impl<T: WsStream + 'static> Read for WsReadWrapper<T> {
                     qbuf.resize(r, 0);
                     qbuf.push(b'\n');
                     *q = &mut qbuf[..];
-                },
+                }
                 (Some(pr), true) => {
                     debug!("prepending prefix and encoding to base64");
                     qbuf.extend_from_slice(pr.as_bytes());
                     qbuf.resize(pr.len() + q.len() * 3 / 2 + 3, 0);
                     let r = base64::encode_config_slice(q, base64::STANDARD, &mut qbuf[pr.len()..]);
-                    qbuf.resize(pr.len()+r, 0);
+                    qbuf.resize(pr.len() + r, 0);
                     qbuf.push(b'\n');
                     *q = &mut qbuf[..];
-                },
+                }
             }
         }
         loop {
@@ -255,7 +255,8 @@ impl<T: WsStream + 'static> Read for WsReadWrapper<T> {
                         let (mut origts1, mut origts2) = ([0u8; 8], [0u8; 4]);
                         origts1.copy_from_slice(&buf[0..8]);
                         origts2.copy_from_slice(&buf[8..12]);
-                        let (origts1, origts2) = (u64::from_be_bytes(origts1), u32::from_be_bytes(origts2));
+                        let (origts1, origts2) =
+                            (u64::from_be_bytes(origts1), u32::from_be_bytes(origts2));
                         let origts = ::std::time::Duration::new(origts1, origts2);
                         let newts = ::std::time::Instant::now() - self.creation_time;
                         let delta = newts.checked_sub(origts).unwrap_or_default();
@@ -263,7 +264,6 @@ impl<T: WsStream + 'static> Read for WsReadWrapper<T> {
                         if self.print_rtts {
                             eprintln!("RTT {}.{:06} s", delta.as_secs(), delta.subsec_micros());
                         }
-
                     } else {
                         warn!("Received a pong with a strange content from websocket");
                     }
@@ -275,9 +275,14 @@ impl<T: WsStream + 'static> Read for WsReadWrapper<T> {
                 }
                 Ready(Some(OwnedMessage::Text(x))) => {
                     debug!("incoming text");
-                    let mut qbuf : Vec<u8> = vec![];
-                    let mut q : &[u8] = x.as_str().as_bytes();
-                    process_prefixes_and_base64(&mut qbuf, &mut q, &self.text_prefix, self.text_base64);
+                    let mut qbuf: Vec<u8> = vec![];
+                    let mut q: &[u8] = x.as_str().as_bytes();
+                    process_prefixes_and_base64(
+                        &mut qbuf,
+                        &mut q,
+                        &self.text_prefix,
+                        self.text_base64,
+                    );
                     match self.debt.process_message(buf, q) {
                         ProcessMessageResult::Return(x) => x,
                         ProcessMessageResult::Recurse => continue,
@@ -286,17 +291,21 @@ impl<T: WsStream + 'static> Read for WsReadWrapper<T> {
                 Ready(Some(OwnedMessage::Binary(mut x))) => {
                     x = self.uncompress.uncompress(x);
                     debug!("incoming binary");
-                    let mut qbuf : Vec<u8> = vec![];
-                    let mut q : &[u8] = x.as_slice();
-                    process_prefixes_and_base64(&mut qbuf, &mut q, &self.binary_prefix, self.binary_base64);
+                    let mut qbuf: Vec<u8> = vec![];
+                    let mut q: &[u8] = x.as_slice();
+                    process_prefixes_and_base64(
+                        &mut qbuf,
+                        &mut q,
+                        &self.binary_prefix,
+                        self.binary_base64,
+                    );
                     match self.debt.process_message(buf, q) {
                         ProcessMessageResult::Return(x) => x,
                         ProcessMessageResult::Recurse => continue,
                     }
                 }
                 NotReady => {
-                    use futures::Async;
-                    use futures::Future;
+                    use futures::{Async, Future};
                     if let Some((de, _intvl)) = self.pong_timeout.as_mut() {
                         match de.poll() {
                             Err(e) => error!("tokio-timer's Delay: {}", e),
@@ -331,7 +340,7 @@ pub struct WsWriteWrapper<T: WsStream + 'static> {
     pub text_base64: bool,
     pub close_status_code: Option<u16>,
     pub close_reason: Option<String>,
-    pub compress : CompressionMethod,
+    pub compress: CompressionMethod,
 }
 
 impl<T: WsStream + 'static> AsyncWrite for WsWriteWrapper<T> {
@@ -339,12 +348,10 @@ impl<T: WsStream + 'static> AsyncWrite for WsWriteWrapper<T> {
         if !self.close_on_shutdown {
             return Ok(Ready(()));
         }
-        let close_data = self.close_status_code.map(|code|
-            websocket::CloseData{
-                status_code: code,
-                reason: self.close_reason.clone().unwrap_or_default()
-            }
-        );
+        let close_data = self.close_status_code.map(|code| websocket::CloseData {
+            status_code: code,
+            reason: self.close_reason.clone().unwrap_or_default(),
+        });
         let mut sink = self.sink.borrow_mut();
         match sink
             .start_send(OwnedMessage::Close(close_data))
@@ -367,7 +374,7 @@ impl<T: WsStream + 'static> Write for WsWriteWrapper<T> {
         let bufv;
         let mut effective_mode = self.mode;
 
-        let mut buf : &[u8] = buf_;
+        let mut buf: &[u8] = buf_;
 
         let origlen = buf.len();
 
@@ -391,10 +398,10 @@ impl<T: WsStream + 'static> Write for WsWriteWrapper<T> {
 
         if decode_base64 {
             if buf.last() == Some(&b'\n') {
-                buf = &buf[..(buf.len()-1)];
+                buf = &buf[..(buf.len() - 1)];
             }
             if buf.last() == Some(&b'\r') {
-                buf = &buf[..(buf.len()-1)];
+                buf = &buf[..(buf.len() - 1)];
             }
             if let Ok(v) = base64::decode(buf) {
                 bufv = v;
@@ -409,15 +416,15 @@ impl<T: WsStream + 'static> Write for WsWriteWrapper<T> {
                 let x = buf.to_vec();
                 let x = self.compress.compress(x);
                 OwnedMessage::Binary(x)
-            },
+            }
             Mode1::Text => {
                 let text_tmp;
                 let text = match ::std::str::from_utf8(buf) {
                     Ok(x) => x,
                     Err(_) => {
                         error!(
-                            "Invalid UTF-8 in a text WebSocket message. Sending lossy data. May be \
-                             caused by unlucky buffer splits."
+                            "Invalid UTF-8 in a text WebSocket message. Sending lossy data. May \
+                             be caused by unlucky buffer splits."
                         );
                         text_tmp = String::from_utf8_lossy(buf);
                         text_tmp.as_ref()
@@ -426,7 +433,12 @@ impl<T: WsStream + 'static> Write for WsWriteWrapper<T> {
                 OwnedMessage::Text(text.to_string())
             }
         };
-        match self.sink.borrow_mut().start_send(om).map_err(io_other_error)? {
+        match self
+            .sink
+            .borrow_mut()
+            .start_send(om)
+            .map_err(io_other_error)?
+        {
             futures::AsyncSink::NotReady(_) => wouldblock(),
             futures::AsyncSink::Ready => Ok(origlen),
         }
@@ -515,9 +527,9 @@ impl<T: WsStream + 'static> ::futures::Future for WsPinger<T> {
     type Error = ();
 
     fn poll(&mut self) -> ::futures::Poll<(), ()> {
+        use futures::{Async, AsyncSink};
+
         use self::WsPingerState::*;
-        use futures::Async;
-        use futures::AsyncSink;
         loop {
             match self.aborter.poll() {
                 Err(e) => warn!("unsync/oneshot: {}", e),
@@ -581,11 +593,17 @@ impl<T: WsStream + 'static> ::futures::Future for WsPinger<T> {
     }
 }
 
+pub type Duplex<S> =
+    ::tokio_codec::Framed<S, websocket::r#async::MessageCodec<websocket::OwnedMessage>>;
 
-pub type Duplex<S> = ::tokio_codec::Framed<S, websocket::r#async::MessageCodec<websocket::OwnedMessage>>;
-
-pub fn finish_building_ws_peer<S>(opts: &super::Options, duplex: Duplex<S>, close_on_shutdown: bool, hup: Option<HupToken>) -> Peer
-    where S : tokio_io::AsyncRead + tokio_io::AsyncWrite + 'static + Send
+pub fn finish_building_ws_peer<S>(
+    opts: &super::Options,
+    duplex: Duplex<S>,
+    close_on_shutdown: bool,
+    hup: Option<HupToken>,
+) -> Peer
+where
+    S: tokio_io::AsyncRead + tokio_io::AsyncWrite + 'static + Send,
 {
     let (sink, stream) = duplex.split();
     let mpsink = Rc::new(RefCell::new(sink));
@@ -603,7 +621,8 @@ pub fn finish_building_ws_peer<S>(opts: &super::Options, duplex: Duplex<S>, clos
         let (tx, rx) = ::futures::unsync::oneshot::channel();
 
         let intv = ::std::time::Duration::from_secs(d);
-        let pinger = super::ws_peer::WsPinger::new(mpsink.clone(), intv,now, rx, opts.max_sent_pings);
+        let pinger =
+            super::ws_peer::WsPinger::new(mpsink.clone(), intv, now, rx, opts.max_sent_pings);
         ::tokio_current_thread::spawn(pinger);
         Some(tx)
     } else {
@@ -624,7 +643,11 @@ pub fn finish_building_ws_peer<S>(opts: &super::Options, duplex: Duplex<S>, clos
         super::readdebt::ZeroMessagesHandling::Deliver
     };
 
-    let compress = match (opts.compress_deflate, opts.compress_gzip, opts.compress_zlib) {
+    let compress = match (
+        opts.compress_deflate,
+        opts.compress_gzip,
+        opts.compress_zlib,
+    ) {
         (false, false, false) => CompressionMethod::None,
         (true, false, false) => CompressionMethod::Deflate,
         (false, true, false) => CompressionMethod::Gzip,
@@ -634,7 +657,11 @@ pub fn finish_building_ws_peer<S>(opts: &super::Options, duplex: Duplex<S>, clos
             CompressionMethod::None
         }
     };
-    let uncompress = match (opts.uncompress_deflate, opts.uncompress_gzip, opts.uncompress_zlib) {
+    let uncompress = match (
+        opts.uncompress_deflate,
+        opts.uncompress_gzip,
+        opts.uncompress_zlib,
+    ) {
         (false, false, false) => CompressionMethod::None,
         (true, false, false) => CompressionMethod::Deflate,
         (false, true, false) => CompressionMethod::Gzip,
@@ -644,8 +671,7 @@ pub fn finish_building_ws_peer<S>(opts: &super::Options, duplex: Duplex<S>, clos
             CompressionMethod::None
         }
     };
-    
-    
+
     let ws_str = WsReadWrapper {
         s: stream,
         pingreply: mpsink.clone(),
@@ -661,7 +687,7 @@ pub fn finish_building_ws_peer<S>(opts: &super::Options, duplex: Duplex<S>, clos
         inhibit_pongs: opts.inhibit_pongs,
         uncompress,
     };
-    let ws_sin = WsWriteWrapper{
+    let ws_sin = WsWriteWrapper {
         sink: mpsink,
         mode: mode1,
         close_on_shutdown,

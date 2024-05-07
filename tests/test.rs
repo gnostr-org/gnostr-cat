@@ -6,7 +6,6 @@ extern crate tokio;
 extern crate tokio_timer;
 
 use futures::future::Future;
-
 use gnostr_cat::{spec, Options, WebsocatConfiguration3};
 
 fn dflt() -> Options {
@@ -153,7 +152,6 @@ fn ws_ll() {
     let prog = prog1.join(prog2);
     run!(core, prog);
 }
-
 
 #[test]
 fn ws_persist() {

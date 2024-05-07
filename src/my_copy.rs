@@ -49,8 +49,8 @@ pub struct Copy<R, W> {
 /// consumed. On error the error is returned and the I/O objects are consumed as
 /// well.
 ///
-/// Unlike original tokio_io::copy::copy, it does not always stop on zero length reads
-/// , handles BrokenPipe error kind as EOF and flushes after every write
+/// Unlike original tokio_io::copy::copy, it does not always stop on zero length
+/// reads , handles BrokenPipe error kind as EOF and flushes after every write
 pub fn copy<R, W>(reader: R, writer: W, opts: CopyOptions, preamble: Vec<String>) -> Copy<R, W>
 where
     R: AsyncRead,

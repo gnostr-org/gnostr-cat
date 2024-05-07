@@ -1,16 +1,19 @@
-#![cfg_attr(feature="cargo-clippy",allow(needless_pass_by_value,cast_lossless,identity_op))]
-use futures::future::{err, ok, Future};
-
-use std::rc::Rc;
-
-use super::{box_up_err, peer_strerr, BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, L2rUser, PeerConstructor, Specifier};
-use tokio_io::io::{read_exact, write_all};
-
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(needless_pass_by_value, cast_lossless, identity_op)
+)]
+use std::ffi::OsString;
 use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr};
+use std::rc::Rc;
 
-use std::ffi::OsString;
+use futures::future::{err, ok, Future};
+use tokio_io::io::{read_exact, write_all};
+
+use super::{
+    box_up_err, peer_strerr, BoxedNewPeerFuture, ConstructParams, L2rUser, Peer, PeerConstructor,
+    Specifier,
+};
 
 #[derive(Debug, Clone)]
 pub enum SocksHostAddr {
@@ -30,7 +33,14 @@ impl<T: Specifier> Specifier for SocksProxy<T> {
     fn construct(&self, cp: ConstructParams) -> PeerConstructor {
         let inner = self.0.construct(cp.clone());
         inner.map(move |p, l2r| {
-            socks5_peer(p, l2r, false, None, &cp.program_options.socks_destination, false)
+            socks5_peer(
+                p,
+                l2r,
+                false,
+                None,
+                &cp.program_options.socks_destination,
+                false,
+            )
         })
     }
     specifier_boilerplate!(noglobalstate has_subspec);

@@ -2,10 +2,14 @@
 //!
 //! Type evolution of a websocat run:
 //!
-//! 1. `&str` - string as passed to command line. When it meets the list of `SpecifierClass`es, there appears:
-//! 2. `SpecifierStack` - specifier class, final string argument and vector of overlays.
-//! 3. `Specifier` - more rigid version of SpecifierStack, with everything parsable parsed. May be nested. When `construct` is called, we get:
-//! 4. `PeerConstructor` - a future or stream that returns one or more connections. After completion, we get one or more of:
+//! 1. `&str` - string as passed to command line. When it meets the list of
+//!    `SpecifierClass`es, there appears:
+//! 2. `SpecifierStack` - specifier class, final string argument and vector of
+//!    overlays.
+//! 3. `Specifier` - more rigid version of SpecifierStack, with everything
+//!    parsable parsed. May be nested. When `construct` is called, we get:
+//! 4. `PeerConstructor` - a future or stream that returns one or more
+//!    connections. After completion, we get one or more of:
 //! 5. `Peer` - an active connection. Once we have two of them, we can start a:
 //! 6. `Session` with two `Transfer`s - forward and reverse.
 
@@ -16,20 +20,20 @@
 extern crate futures;
 #[macro_use]
 extern crate tokio_io;
+extern crate anymap;
+extern crate http_bytes;
+extern crate tokio_codec;
 extern crate tokio_current_thread;
 extern crate tokio_reactor;
 extern crate tokio_tcp;
-extern crate tokio_udp;
-extern crate tokio_codec;
 extern crate tokio_timer;
+extern crate tokio_udp;
 extern crate websocket;
 extern crate websocket_base;
-extern crate http_bytes;
-extern crate anymap;
 pub use http_bytes::http;
 
-extern crate tk_listen;
 extern crate net2;
+extern crate tk_listen;
 
 #[macro_use]
 extern crate log;
@@ -42,14 +46,13 @@ extern crate smart_default;
 #[macro_use]
 extern crate derivative;
 
-use futures::future::Future;
-use tokio_io::{AsyncRead, AsyncWrite};
-
-use futures::Stream;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
+
+use futures::future::Future;
+use futures::Stream;
+use tokio_io::{AsyncRead, AsyncWrite};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -77,7 +80,7 @@ impl WebsocatConfiguration1 {
 /// A structural form: two chains of specifier nodes.
 /// Futures/async is not yet involved at this stage, but everything
 /// should be checked and ready to do to start it (apart from OS errors)
-/// 
+///
 /// This form is designed to be editable by lints and command-line options.
 pub struct WebsocatConfiguration2 {
     pub opts: Options,
@@ -95,8 +98,9 @@ impl WebsocatConfiguration2 {
     }
 }
 
-/// An immutable chain of functions that results in a `Future`s or `Streams` that rely on each other.
-/// This is somewhat like a frozen form of `WebsocatConfiguration2`.
+/// An immutable chain of functions that results in a `Future`s or `Streams`
+/// that rely on each other. This is somewhat like a frozen form of
+/// `WebsocatConfiguration2`.
 pub struct WebsocatConfiguration3 {
     pub opts: Options,
     pub s1: Rc<dyn Specifier>,
@@ -116,10 +120,7 @@ pub mod options;
 pub use crate::options::Options;
 
 #[derive(SmartDefault)]
-pub struct ProgramState(
-    #[default(anymap::AnyMap::with_capacity(2))]
-    anymap::AnyMap
-);
+pub struct ProgramState(#[default(anymap::AnyMap::with_capacity(2))] anymap::AnyMap);
 
 /// Some information passed from the left specifier Peer to the right
 #[derive(Default, Clone)]
@@ -142,7 +143,7 @@ pub enum L2rUser {
 }
 
 /// Resolves if/when TCP socket gets reset
-pub type HupToken = Box<dyn Future<Item=(), Error=Box<dyn std::error::Error>>>;
+pub type HupToken = Box<dyn Future<Item = (), Error = Box<dyn std::error::Error>>>;
 
 pub struct Peer(Box<dyn AsyncRead>, Box<dyn AsyncWrite>, Option<HupToken>);
 
@@ -168,34 +169,33 @@ pub use crate::util::{brokenpipe, io_other_error, simple_err2, wouldblock};
 pub mod stdio_peer;
 
 pub mod file_peer;
+pub mod http_peer;
 pub mod mirror_peer;
 pub mod net_peer;
 pub mod stdio_threaded_peer;
 pub mod trivial_peer;
 pub mod ws_client_peer;
+pub mod ws_lowlevel_peer;
 pub mod ws_peer;
 pub mod ws_server_peer;
-pub mod ws_lowlevel_peer;
-pub mod http_peer;
 
 #[cfg(feature = "tokio-process")]
 pub mod process_peer;
 
-
-#[cfg(all(windows,feature = "windows_named_pipes"))]
+#[cfg(all(windows, feature = "windows_named_pipes"))]
 pub mod windows_np_peer;
 
 #[cfg(unix)]
 pub mod unix_peer;
 
 pub mod broadcast_reuse_peer;
-pub mod jsonrpc_peer;
-pub mod timestamp_peer;
-pub mod line_peer;
-pub mod lengthprefixed_peer;
 pub mod foreachmsg_peer;
+pub mod jsonrpc_peer;
+pub mod lengthprefixed_peer;
+pub mod line_peer;
 pub mod primitive_reuse_peer;
 pub mod reconnect_peer;
+pub mod timestamp_peer;
 
 pub mod socks5_peer;
 #[cfg(feature = "ssl")]

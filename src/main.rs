@@ -25,15 +25,13 @@ extern crate structopt;
 extern crate atty;
 
 extern crate http_bytes;
-use http_bytes::http;
-
 use std::net::{IpAddr, SocketAddr};
-
-use structopt::StructOpt;
 
 use gnostr_cat::options::StaticFile;
 use gnostr_cat::socks5_peer::{SocksHostAddr, SocksSocketAddr};
 use gnostr_cat::{Options, SpecifierClass, WebsocatConfiguration1};
+use http_bytes::http;
+use structopt::StructOpt;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -57,9 +55,10 @@ Basic examples:
 )]
 struct Opt {
     /// In simple mode, WebSocket URL to connect.
-    /// In advanced mode first address (there are many kinds of addresses) to use.
-    /// See --help=types for info about address types.
-    /// If this is an address for listening, it will try serving multiple connections.
+    /// In advanced mode first address (there are many kinds of addresses) to
+    /// use. See --help=types for info about address types.
+    /// If this is an address for listening, it will try serving multiple
+    /// connections.
     addr1: Option<String>,
     /// In advanced mode, second address to connect.
     /// If this is an address for listening, it will accept only one connection.
@@ -74,7 +73,8 @@ struct Opt {
     #[structopt(
         short = "U",
         long = "unidirectional-reverse",
-        help = "Inhibit copying data in the other direction (or maybe in both directions if combined with -u)"
+        help = "Inhibit copying data in the other direction (or maybe in both directions if \
+                combined with -u)"
     )]
     unidirectional_reverse: bool,
 
@@ -108,7 +108,9 @@ struct Opt {
     #[structopt(
         short = "h",
         long = "help",
-        help = "See the help.\n--help=short is the list of easy options and address types\n--help=long lists all options and types (see [A] markers)\n--help=doc also shows longer description and examples."
+        help = "See the help.\n--help=short is the list of easy options and address \
+                types\n--help=long lists all options and types (see [A] markers)\n--help=doc also \
+                shows longer description and examples."
     )]
     help: Option<String>,
 
@@ -133,34 +135,37 @@ struct Opt {
     udp_oneshot_mode: bool,
 
     /// [A] Set SO_BROADCAST
-    #[structopt(long="udp-broadcast")]
+    #[structopt(long = "udp-broadcast")]
     udp_broadcast: bool,
 
     /// [A] Set IP[V6]_MULTICAST_LOOP
-    #[structopt(long="udp-multicast-loop")]
+    #[structopt(long = "udp-multicast-loop")]
     udp_multicast_loop: bool,
 
     /// [A] Set IP_TTL, also IP_MULTICAST_TTL if applicable
-    #[structopt(long="udp-ttl")]
+    #[structopt(long = "udp-ttl")]
     udp_ttl: Option<u32>,
 
     /// [A] Issue IP[V6]_ADD_MEMBERSHIP for specified multicast address.
     /// Can be specified multiple times.
-    #[structopt(long="udp-multicast")]
+    #[structopt(long = "udp-multicast")]
     udp_join_multicast_addr: Vec<std::net::IpAddr>,
 
     /// [A] IPv4 address of multicast network interface.
-    /// Has to be either not specified or specified the same number of times as multicast IPv4 addresses. Order matters.
-    #[structopt(long="udp-multicast-iface-v4")]
+    /// Has to be either not specified or specified the same number of times as
+    /// multicast IPv4 addresses. Order matters.
+    #[structopt(long = "udp-multicast-iface-v4")]
     udp_join_multicast_iface_v4: Vec<std::net::Ipv4Addr>,
 
     /// [A] Index of network interface for IPv6 multicast.
-    /// Has to be either not specified or specified the same number of times as multicast IPv6 addresses. Order matters.
-    #[structopt(long="udp-multicast-iface-v6")]
+    /// Has to be either not specified or specified the same number of times as
+    /// multicast IPv6 addresses. Order matters.
+    #[structopt(long = "udp-multicast-iface-v6")]
     udp_join_multicast_iface_v6: Vec<u32>,
 
-    /// [A] Set SO_REUSEADDR for UDP socket. Listening TCP sockets are always reuseaddr.
-    #[structopt(long="udp-reuseaddr")]
+    /// [A] Set SO_REUSEADDR for UDP socket. Listening TCP sockets are always
+    /// reuseaddr.
+    #[structopt(long = "udp-reuseaddr")]
     udp_reuseaddr: bool,
 
     #[structopt(
@@ -171,14 +176,16 @@ struct Opt {
 
     #[structopt(
         long = "accept-from-fd",
-        help = "[A] Do not call `socket(2)` in UNIX socket listener peer, start with `accept(2)` using specified file descriptor number as argument instead of filename"
+        help = "[A] Do not call `socket(2)` in UNIX socket listener peer, start with `accept(2)` \
+                using specified file descriptor number as argument instead of filename"
     )]
     unix_socket_accept_from_fd: bool,
 
     #[structopt(
         long = "exec-args",
         raw(allow_hyphen_values = r#"true"#),
-        help = "[A] Arguments for the `exec:` specifier. Must be the last option, everything after it gets into the exec args list."
+        help = "[A] Arguments for the `exec:` specifier. Must be the last option, everything \
+                after it gets into the exec args list."
     )]
     exec_args: Vec<String>,
 
@@ -210,23 +217,26 @@ struct Opt {
     #[structopt(
         long = "header",
         short = "H",
-        help = "Add custom HTTP header to websocket client request. Separate header name and value with a colon and optionally a single space. Can be used multiple times. Note that single -H may eat multiple further arguments, leading to confusing errors. Specify headers at the end or with equal sign like -H='X: y'.",
+        help = "Add custom HTTP header to websocket client request. Separate header name and \
+                value with a colon and optionally a single space. Can be used multiple times. \
+                Note that single -H may eat multiple further arguments, leading to confusing \
+                errors. Specify headers at the end or with equal sign like -H='X: y'.",
         parse(try_from_str = "interpret_custom_header")
     )]
     custom_headers: Vec<(String, Vec<u8>)>,
 
     #[structopt(
         long = "server-header",
-        help = "Add custom HTTP header to websocket upgrade reply. Separate header name and value with a colon and optionally a single space. Can be used multiple times. Note that single -H may eat multiple further arguments, leading to confusing errors.",
+        help = "Add custom HTTP header to websocket upgrade reply. Separate header name and value \
+                with a colon and optionally a single space. Can be used multiple times. Note that \
+                single -H may eat multiple further arguments, leading to confusing errors.",
         parse(try_from_str = "interpret_custom_header")
     )]
     custom_reply_headers: Vec<(String, Vec<u8>)>,
 
     /// Forward specified incoming request header to
     /// H_* environment variable for `exec:`-like specifiers.
-    #[structopt(
-        long = "header-to-env",
-    )]
+    #[structopt(long = "header-to-env")]
     headers_to_env: Vec<String>,
 
     #[structopt(
@@ -258,7 +268,9 @@ struct Opt {
 
     #[structopt(
         long = "no-fixups",
-        help = "[A] Don't perform automatic command-line fixups. May destabilize websocat operation. Use --dump-spec without --no-fixups to discover what is being inserted automatically and read the full manual about Websocat internal workings."
+        help = "[A] Don't perform automatic command-line fixups. May destabilize websocat \
+                operation. Use --dump-spec without --no-fixups to discover what is being inserted \
+                automatically and read the full manual about Websocat internal workings."
     )]
     no_lints: bool,
 
@@ -293,7 +305,8 @@ struct Opt {
     #[structopt(
         short = "S",
         long = "strict",
-        help = "strict line/message mode: drop too long messages instead of splitting them, drop incomplete lines."
+        help = "strict line/message mode: drop too long messages instead of splitting them, drop \
+                incomplete lines."
     )]
     strict_mode: bool,
 
@@ -306,14 +319,20 @@ struct Opt {
 
     #[structopt(
         long = "restrict-uri",
-        help = "When serving a websocket, only accept the given URI, like `/ws`\nThis liberates other URIs for things like serving static files or proxying."
+        help = "When serving a websocket, only accept the given URI, like `/ws`\nThis liberates \
+                other URIs for things like serving static files or proxying."
     )]
     restrict_uri: Option<String>,
 
     #[structopt(
         short = "F",
         long = "static-file",
-        help = "Serve a named static file for non-websocket connections.\nArgument syntax: <URI>:<Content-Type>:<file-path>\nArgument example: /index.html:text/html:index.html\nDirectories are not and will not be supported for security reasons.\nCan be specified multiple times. Recommended to specify them at the end or with equal sign like `-F=...`, otherwise this option may eat positional arguments",
+        help = "Serve a named static file for non-websocket connections.\nArgument syntax: \
+                <URI>:<Content-Type>:<file-path>\nArgument example: \
+                /index.html:text/html:index.html\nDirectories are not and will not be supported \
+                for security reasons.\nCan be specified multiple times. Recommended to specify \
+                them at the end or with equal sign like `-F=...`, otherwise this option may eat \
+                positional arguments",
         parse(try_from_str = "interpret_static_file")
     )]
     serve_static_files: Vec<StaticFile>,
@@ -321,19 +340,23 @@ struct Opt {
     #[structopt(
         short = "e",
         long = "set-environment",
-        help = "Set WEBSOCAT_* environment variables when doing exec:/cmd:/sh-c:\nCurrently it's WEBSOCAT_URI and WEBSOCAT_CLIENT for\nrequest URI and client address (if TCP)\nBeware of ShellShock or similar security problems."
+        help = "Set WEBSOCAT_* environment variables when doing exec:/cmd:/sh-c:\nCurrently it's \
+                WEBSOCAT_URI and WEBSOCAT_CLIENT for\nrequest URI and client address (if \
+                TCP)\nBeware of ShellShock or similar security problems."
     )]
     exec_set_env: bool,
 
     #[structopt(
         long = "reuser-send-zero-msg-on-disconnect",
-        help = "[A] Make reuse-raw: send a zero-length message to the peer when some clients disconnects."
+        help = "[A] Make reuse-raw: send a zero-length message to the peer when some clients \
+                disconnects."
     )]
     reuser_send_zero_msg_on_disconnect: bool,
 
     #[structopt(
         long = "exec-sighup-on-zero-msg",
-        help = "[A] Make exec: or sh-c: or cmd: send SIGHUP on UNIX when facing incoming zero-length message."
+        help = "[A] Make exec: or sh-c: or cmd: send SIGHUP on UNIX when facing incoming \
+                zero-length message."
     )]
     process_zero_sighup: bool,
 
@@ -345,13 +368,15 @@ struct Opt {
 
     #[structopt(
         long = "exec-exit-on-disconnect",
-        help = "[A] Make exec: or sh-c: or cmd: immediately exit when connection is closed, don't wait for termination."
+        help = "[A] Make exec: or sh-c: or cmd: immediately exit when connection is closed, don't \
+                wait for termination."
     )]
     process_exit_on_disconnect: bool,
 
     #[structopt(
         long = "jsonrpc",
-        help = "Format messages you type as JSON RPC 2.0 method calls. First word becomes method name, the rest becomes parameters, possibly automatically wrapped in []."
+        help = "Format messages you type as JSON RPC 2.0 method calls. First word becomes method \
+                name, the rest becomes parameters, possibly automatically wrapped in []."
     )]
     jsonrpc: bool,
 
@@ -364,13 +389,15 @@ struct Opt {
 
     #[structopt(
         long = "socks5",
-        help = "Use specified address:port as a SOCKS5 proxy. Note that proxy authentication is not supported yet. Example: --socks5 127.0.0.1:9050"
+        help = "Use specified address:port as a SOCKS5 proxy. Note that proxy authentication is \
+                not supported yet. Example: --socks5 127.0.0.1:9050"
     )]
     auto_socks5: Option<SocketAddr>,
 
     #[structopt(
         long = "socks5-bind-script",
-        help = "[A] Execute specified script in `socks5-bind:` mode when remote port number becomes known.",
+        help = "[A] Execute specified script in `socks5-bind:` mode when remote port number \
+                becomes known.",
         parse(from_os_str)
     )]
     socks5_bind_script: Option<OsString>,
@@ -378,14 +405,18 @@ struct Opt {
     #[structopt(
         long = "tls-domain",
         alias = "ssl-domain",
-        help = "[A] Specify domain for SNI or certificate verification when using tls-connect: overlay"
+        help = "[A] Specify domain for SNI or certificate verification when using tls-connect: \
+                overlay"
     )]
     tls_domain: Option<String>,
 
     #[cfg(feature = "ssl")]
     #[structopt(
         long = "pkcs12-der",
-        help = "Pkcs12 archive needed to accept SSL connections, certificate and key.\nA command to output it: openssl pkcs12 -export -out output.pkcs12 -inkey key.pem -in cert.pem\nUse with -s (--server-mode) option or with manually specified TLS overlays.\nSee moreexamples.md for more info.",
+        help = "Pkcs12 archive needed to accept SSL connections, certificate and key.\nA command \
+                to output it: openssl pkcs12 -export -out output.pkcs12 -inkey key.pem -in \
+                cert.pem\nUse with -s (--server-mode) option or with manually specified TLS \
+                overlays.\nSee moreexamples.md for more info.",
         parse(try_from_os_str = "gnostr_cat::ssl_peer::interpret_pkcs12")
     )]
     pkcs12_der: Option<Vec<u8>>,
@@ -428,7 +459,8 @@ struct Opt {
     #[structopt(long = "ping-interval")]
     ws_ping_interval: Option<u64>,
 
-    /// Drop WebSocket connection if Pong message not received for this number of seconds
+    /// Drop WebSocket connection if Pong message not received for this number
+    /// of seconds
     #[structopt(long = "ping-timeout")]
     ws_ping_timeout: Option<u64>,
 
@@ -446,13 +478,13 @@ struct Opt {
     request_uri: Option<http::Uri>,
 
     /// [A] Method to use for `http-request:` specifier
-    #[structopt(long = "request-method", short="X")]
+    #[structopt(long = "request-method", short = "X")]
     request_method: Option<http::Method>,
 
     /// [A] Specify HTTP request headers for `http-request:` specifier.
     #[structopt(
         long = "request-header",
-        parse(try_from_str = "interpret_custom_header2"),
+        parse(try_from_str = "interpret_custom_header2")
     )]
     request_headers: Vec<(http::header::HeaderName, http::header::HeaderValue)>,
 
@@ -477,9 +509,8 @@ struct Opt {
     max_messages_rev: Option<usize>,
 
     /// [A] Delay before reconnect attempt for `autoreconnect:` overlay.
-    #[structopt(long = "--autoreconnect-delay-millis", default_value="20")]
+    #[structopt(long = "--autoreconnect-delay-millis", default_value = "20")]
     autoreconnect_delay_millis: u64,
-
 
     /// [A] Prepend specified text to each received WebSocket text message.
     /// Also strip this prefix from outgoing messages, explicitly marking
@@ -494,13 +525,15 @@ struct Opt {
     pub ws_binary_prefix: Option<String>,
 
     /// Encode incoming binary WebSocket messages in one-line Base64
-    /// If `--binary-prefix` (see `--help=full`) is set, outgoing WebSocket messages
-    /// that start with the prefix are decoded from base64 prior to sending.
+    /// If `--binary-prefix` (see `--help=full`) is set, outgoing WebSocket
+    /// messages that start with the prefix are decoded from base64 prior to
+    /// sending.
     #[structopt(long = "--base64")]
     pub ws_binary_base64: bool,
 
     /// [A] Encode incoming text WebSocket messages in one-line Base64.
-    /// I don't know whether it can be ever useful, but it's for symmetry with `--base64`.
+    /// I don't know whether it can be ever useful, but it's for symmetry with
+    /// `--base64`.
     #[structopt(long = "--base64-text")]
     pub ws_text_base64: bool,
 
@@ -513,8 +546,9 @@ struct Opt {
     #[structopt(long = "--close-reason")]
     pub close_reason: Option<String>,
 
-    /// [A] On UNIX, set stdin and stdout to nonblocking mode instead of spawning a thread.
-    /// This should improve performance, but may break other programs running on the same console.
+    /// [A] On UNIX, set stdin and stdout to nonblocking mode instead of
+    /// spawning a thread. This should improve performance, but may break
+    /// other programs running on the same console.
     #[structopt(long = "--async-stdio")]
     pub asyncstdio: bool,
 
@@ -522,7 +556,8 @@ struct Opt {
     #[structopt(long = "--no-async-stdio")]
     pub noasyncstdio: bool,
 
-    /// Add `Authorization: Basic` HTTP request header with this base64-encoded parameter
+    /// Add `Authorization: Basic` HTTP request header with this base64-encoded
+    /// parameter
     #[structopt(long = "--basic-auth")]
     pub basic_auth: Option<String>,
 
@@ -536,23 +571,30 @@ struct Opt {
 
     /// [A] Use monotonic clock for `timestamp:` overlay
     #[structopt(long = "--timestamp-monotonic")]
-     pub timestamp_monotonic: bool,
+    pub timestamp_monotonic: bool,
 
-    /// Print measured round-trip-time to stderr after each received WebSocket pong.
+    /// Print measured round-trip-time to stderr after each received WebSocket
+    /// pong.
     #[structopt(long = "print-ping-rtts")]
     pub print_ping_rtts: bool,
 
-    /// [A] Specify encryption/decryption key for `crypto:` specifier. Requires `base64:`, `file:` or `pwd:` prefix.
+    /// [A] Specify encryption/decryption key for `crypto:` specifier. Requires
+    /// `base64:`, `file:` or `pwd:` prefix.
     #[cfg(feature = "crypto_peer")]
-    #[structopt(long = "crypto-key", parse(try_from_str = "gnostr_cat::crypto_peer::interpret_opt"))]
+    #[structopt(
+        long = "crypto-key",
+        parse(try_from_str = "gnostr_cat::crypto_peer::interpret_opt")
+    )]
     pub crypto_key: Option<[u8; 32]>,
 
-    /// [A] Swap encryption and decryption operations in `crypto:` specifier - encrypt on read, decrypto on write.
+    /// [A] Swap encryption and decryption operations in `crypto:` specifier -
+    /// encrypt on read, decrypto on write.
     #[cfg(feature = "crypto_peer")]
     #[structopt(long = "crypto-reverse")]
     pub crypto_reverse: bool,
 
-    /// Expose Prometheus metrics on specified IP address and port in addition to running usual Websocat session
+    /// Expose Prometheus metrics on specified IP address and port in addition
+    /// to running usual Websocat session
     #[cfg(feature = "prometheus_peer")]
     #[structopt(long = "prometheus")]
     pub prometheus: Option<SocketAddr>,
@@ -561,95 +603,138 @@ struct Opt {
     #[structopt(long = "byte-to-exit-on", default_value = "28")]
     byte_to_exit_on: u8,
 
-    /// [A] Maximum size of incoming WebSocket messages (sans of one data frame), to prevent memory overflow
+    /// [A] Maximum size of incoming WebSocket messages (sans of one data
+    /// frame), to prevent memory overflow
     #[structopt(long = "max-ws-message-length", default_value = "209715200")]
     pub max_ws_message_length: usize,
-    /// [A] Maximum size of incoming WebSocket frames, to prevent memory overflow
+    /// [A] Maximum size of incoming WebSocket frames, to prevent memory
+    /// overflow
     #[structopt(long = "max-ws-frame-length", default_value = "104857600")]
     pub max_ws_frame_length: usize,
 
-    /// Prepend copied data with a specified string. Can be specified multiple times.
-    #[structopt(long = "preamble", short="p")]
+    /// Prepend copied data with a specified string. Can be specified multiple
+    /// times.
+    #[structopt(long = "preamble", short = "p")]
     pub preamble: Vec<String>,
 
-    /// Prepend copied data with a specified string (reverse direction). Can be specified multiple times.
-    #[structopt(long = "preamble-reverse", short="P")]
+    /// Prepend copied data with a specified string (reverse direction). Can be
+    /// specified multiple times.
+    #[structopt(long = "preamble-reverse", short = "P")]
     pub preamble_reverse: Vec<String>,
 
-
-    /// [A] Compress data coming to a WebSocket using deflate method. Affects only binary WebSocket messages.
+    /// [A] Compress data coming to a WebSocket using deflate method. Affects
+    /// only binary WebSocket messages.
     #[structopt(long = "compress-deflate")]
     pub compress_deflate: bool,
 
-    /// [A] Compress data coming to a WebSocket using zlib method. Affects only binary WebSocket messages.
+    /// [A] Compress data coming to a WebSocket using zlib method. Affects only
+    /// binary WebSocket messages.
     #[structopt(long = "compress-zlib")]
     pub compress_zlib: bool,
 
-    /// [A] Compress data coming to a WebSocket using gzip method. Affects only binary WebSocket messages.
+    /// [A] Compress data coming to a WebSocket using gzip method. Affects only
+    /// binary WebSocket messages.
     #[structopt(long = "compress-gzip")]
     pub compress_gzip: bool,
 
-    /// [A] Uncompress data coming from a WebSocket using deflate method. Affects only binary WebSocket messages.
+    /// [A] Uncompress data coming from a WebSocket using deflate method.
+    /// Affects only binary WebSocket messages.
     #[structopt(long = "uncompress-deflate")]
     pub uncompress_deflate: bool,
 
-    /// [A] Uncompress data coming from a WebSocket using deflate method. Affects only binary WebSocket messages.
+    /// [A] Uncompress data coming from a WebSocket using deflate method.
+    /// Affects only binary WebSocket messages.
     #[structopt(long = "uncompress-zlib")]
     pub uncompress_zlib: bool,
 
-    /// [A] Uncompress data coming from a WebSocket using deflate method. Affects only binary WebSocket messages.
+    /// [A] Uncompress data coming from a WebSocket using deflate method.
+    /// Affects only binary WebSocket messages.
     #[structopt(long = "uncompress-gzip")]
     pub uncompress_gzip: bool,
 
-    /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_a`.
-    /// Format is `symbol@library_file`. If `symbol@` is omitted, `websocat_transform` is implied.
+    /// [A] Load specified symbol from specified native library and use it for
+    /// `native_plugin_transform_a`. Format is `symbol@library_file`. If
+    /// `symbol@` is omitted, `websocat_transform` is implied.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-a",  parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    #[structopt(
+        long = "native-plugin-a",
+        parse(try_from_str = "gnostr_cat::transform_peer::load_symbol")
+    )]
     pub native_transform_a: Option<gnostr_cat::transform_peer::Sym>,
 
-    /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_b`.
+    /// [A] Load specified symbol from specified native library and use it for
+    /// `native_plugin_transform_b`.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-b", parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    #[structopt(
+        long = "native-plugin-b",
+        parse(try_from_str = "gnostr_cat::transform_peer::load_symbol")
+    )]
     pub native_transform_b: Option<gnostr_cat::transform_peer::Sym>,
 
-    /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_c`.
+    /// [A] Load specified symbol from specified native library and use it for
+    /// `native_plugin_transform_c`.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-c", parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    #[structopt(
+        long = "native-plugin-c",
+        parse(try_from_str = "gnostr_cat::transform_peer::load_symbol")
+    )]
     pub native_transform_c: Option<gnostr_cat::transform_peer::Sym>,
 
-    /// [A] Load specified symbol from specified native library and use it for `native_plugin_transform_d`.
+    /// [A] Load specified symbol from specified native library and use it for
+    /// `native_plugin_transform_d`.
     #[cfg(feature = "native_plugins")]
-    #[structopt(long = "native-plugin-d", parse(try_from_str = "gnostr_cat::transform_peer::load_symbol"))]
+    #[structopt(
+        long = "native-plugin-d",
+        parse(try_from_str = "gnostr_cat::transform_peer::load_symbol")
+    )]
     pub native_transform_d: Option<gnostr_cat::transform_peer::Sym>,
 
-    /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_a:`.
-    /// Format is `symbol@library_file`. If `symbol@` is omitted, `websocat_transform` is implied.
+    /// [A] Load specified symbol from specified wasm module and use it for
+    /// `wasm_plugin_transform_a:`. Format is `symbol@library_file`. If
+    /// `symbol@` is omitted, `websocat_transform` is implied.
     /// The wasm module should also have `malloc` and `free` functions exposed.
-    /// Prepend `library_file` with `!` to load serialized cwasm produced by `wasmtime compile` instead of compining the module in Websocat.
+    /// Prepend `library_file` with `!` to load serialized cwasm produced by
+    /// `wasmtime compile` instead of compining the module in Websocat.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-a",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    #[structopt(
+        long = "wasm-plugin-a",
+        parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol")
+    )]
     pub wasm_transform_a: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
-    /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_b:`.
+    /// [A] Load specified symbol from specified wasm module and use it for
+    /// `wasm_plugin_transform_b:`.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-b",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    #[structopt(
+        long = "wasm-plugin-b",
+        parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol")
+    )]
     pub wasm_transform_b: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
-    /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_c:`.
+    /// [A] Load specified symbol from specified wasm module and use it for
+    /// `wasm_plugin_transform_c:`.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-c",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    #[structopt(
+        long = "wasm-plugin-c",
+        parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol")
+    )]
     pub wasm_transform_c: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
-    /// [A] Load specified symbol from specified wasm module and use it for `wasm_plugin_transform_d:`.
+    /// [A] Load specified symbol from specified wasm module and use it for
+    /// `wasm_plugin_transform_d:`.
     #[cfg(feature = "wasm_plugins")]
-    #[structopt(long = "wasm-plugin-d",  parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol"))]
+    #[structopt(
+        long = "wasm-plugin-d",
+        parse(try_from_str = "gnostr_cat::wasm_transform_peer::load_symbol")
+    )]
     pub wasm_transform_d: Option<gnostr_cat::wasm_transform_peer::Handle>,
 
     /// [A] Omit `jsonrpc` field when using `--jsonrpc`, e.g. for Chromium
     #[structopt(long = "jsonrpc-omit-jsonrpc")]
     pub jsonrpc_omit_jsonrpc: bool,
 
-    /// [A] Stop replying to incoming WebSocket pings after specified number of replies
+    /// [A] Stop replying to incoming WebSocket pings after specified number of
+    /// replies
     #[structopt(long = "inhibit-pongs")]
     pub inhibit_pongs: Option<usize>,
 
@@ -657,11 +742,13 @@ struct Opt {
     #[structopt(long = "max-sent-pings")]
     pub max_sent_pings: Option<usize>,
 
-    /// [A] Use this number of length header bytes for `lengthprefixed:` overlay.
+    /// [A] Use this number of length header bytes for `lengthprefixed:`
+    /// overlay.
     #[structopt(long = "--lengthprefixed-nbytes", default_value = "4")]
     pub lengthprefixed_header_bytes: usize,
 
-    /// [A] Use little-endian framing headers instead of big-endian for `lengthprefixed:` overlay.
+    /// [A] Use little-endian framing headers instead of big-endian for
+    /// `lengthprefixed:` overlay.
     #[structopt(long = "--lengthprefixed-little-endian")]
     pub lengthprefixed_little_endian: bool,
 }
@@ -682,7 +769,9 @@ fn interpret_custom_header(x: &str) -> Result<(String, Vec<u8>)> {
     Ok((hn.to_owned(), hv.as_bytes().to_vec()))
 }
 
-fn interpret_custom_header2(x: &str) -> Result<(http::header::HeaderName, http::header::HeaderValue)> {
+fn interpret_custom_header2(
+    x: &str,
+) -> Result<(http::header::HeaderName, http::header::HeaderValue)> {
     let colon = x.find(':');
     let colon = if let Some(colon) = colon {
         colon
@@ -697,7 +786,7 @@ fn interpret_custom_header2(x: &str) -> Result<(http::header::HeaderName, http::
     use std::str::FromStr;
     let hn = http::header::HeaderName::from_str(hn)?;
     let hv = http::header::HeaderValue::from_str(hv)?;
-    Ok((hn,hv))
+    Ok((hn, hv))
 }
 
 fn interpret_static_file(x: &str) -> Result<StaticFile> {
@@ -781,7 +870,6 @@ mod logging {
             .try_init()?;
         Ok(())
     }
-
 }
 
 fn run() -> Result<()> {
@@ -817,14 +905,20 @@ fn run() -> Result<()> {
     }
 
     if cmd.just_generate_key {
-        println!("{}", websocket_base::header::WebSocketKey::new().serialize());
+        println!(
+            "{}",
+            websocket_base::header::WebSocketKey::new().serialize()
+        );
         return Ok(());
     }
 
     if let Some(key) = cmd.just_generate_accept {
         use std::str::FromStr;
         let k = websocket_base::header::WebSocketKey::from_str(&key)?;
-        println!("{}", websocket_base::header::WebSocketAccept::new(&k).serialize());
+        println!(
+            "{}",
+            websocket_base::header::WebSocketAccept::new(&k).serialize()
+        );
         return Ok(());
     }
 
@@ -842,7 +936,7 @@ fn run() -> Result<()> {
         Err("--no-async-stdio and --async-stdio are not meaningful together")?;
     }
 
-    if ! cmd.noasyncstdio {
+    if !cmd.noasyncstdio {
         if atty::isnt(atty::Stream::Stdin) && atty::isnt(atty::Stream::Stdout) {
             cmd.asyncstdio = true;
         }
@@ -998,15 +1092,22 @@ fn run() -> Result<()> {
     if let Some(ba) = cmd.basic_auth {
         let x = base64::encode(&ba);
         let q = format!("Basic {}", x);
-        opts.custom_headers.push(("Authorization".to_owned(), q.as_bytes().to_vec()));
-        opts.request_headers.push((http::header::AUTHORIZATION, http::header::HeaderValue::from_bytes(q.as_bytes()).unwrap()));
+        opts.custom_headers
+            .push(("Authorization".to_owned(), q.as_bytes().to_vec()));
+        opts.request_headers.push((
+            http::header::AUTHORIZATION,
+            http::header::HeaderValue::from_bytes(q.as_bytes()).unwrap(),
+        ));
     }
 
     let (s1, s2): (String, String) = match (cmd.addr1, cmd.addr2) {
         (None, None) => {
             for x in std::env::args() {
                 if x == "-p" || x == "-P" || x == "--preamble" || x == "--preamble-reverse" {
-                    eprintln!("Warning: all dashless arguments after -p or -P are considered part of the preamble. You may want to move -p/-P to the end of the command line.")
+                    eprintln!(
+                        "Warning: all dashless arguments after -p or -P are considered part of \
+                         the preamble. You may want to move -p/-P to the end of the command line."
+                    )
                 }
             }
             return Err("No URL specified. Use `gnostr-cat --help` to show the help message.")?;
@@ -1014,10 +1115,16 @@ fn run() -> Result<()> {
         (Some(cmds1), Some(cmds2)) => {
             // Advanced mode
             if cmd.jsonrpc {
-                Err("--jsonrpc option is only for simple (single-argument) mode.\nUse `jsonrpc:` specifier manually if you want it in advanced mode.")?
+                Err(
+                    "--jsonrpc option is only for simple (single-argument) mode.\nUse `jsonrpc:` \
+                     specifier manually if you want it in advanced mode.",
+                )?
             }
             if cmd.server_mode {
-                Err("--server and two positional arguments are incompatible.\nBuild server command line without -s option, but with `listen` address types")?
+                Err(
+                    "--server and two positional arguments are incompatible.\nBuild server \
+                     command line without -s option, but with `listen` address types",
+                )?
             }
             (cmds1, cmds2)
         }
@@ -1107,10 +1214,12 @@ fn run() -> Result<()> {
         }))?;
     }
     if cmd.jsonrpc {
-        websocat2
-            .s1
-            .overlays
-            .insert(0, gnostr_cat::specifier::SpecifierNode{cls: ::std::rc::Rc::new(gnostr_cat::jsonrpc_peer::JsonRpcClass)});
+        websocat2.s1.overlays.insert(
+            0,
+            gnostr_cat::specifier::SpecifierNode {
+                cls: ::std::rc::Rc::new(gnostr_cat::jsonrpc_peer::JsonRpcClass),
+            },
+        );
     }
     debug!("Done third phase of interpreting options.");
     let websocat = websocat2.parse2()?;

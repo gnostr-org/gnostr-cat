@@ -1,8 +1,8 @@
-use super::{L2rUser, Options, Result};
-use super::{PeerConstructor, ProgramState};
 use std;
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use super::{L2rUser, Options, PeerConstructor, ProgramState, Result};
 
 pub enum ClassMessageBoundaryStatus {
     StreamOriented,
@@ -18,16 +18,19 @@ pub enum ClassMulticonnectStatus {
 
 /// A trait for a each specified type's accompanying object
 ///
-/// Don't forget to register each instance at the `list_of_all_specifier_classes` macro.
+/// Don't forget to register each instance at the
+/// `list_of_all_specifier_classes` macro.
 pub trait SpecifierClass: std::fmt::Debug {
     /// The primary name of the class
     fn get_name(&self) -> &'static str;
-    /// Names to match command line parameters against, with a `:` colon if needed
+    /// Names to match command line parameters against, with a `:` colon if
+    /// needed
     fn get_prefixes(&self) -> Vec<&'static str>;
     /// --long-help snippet about this specifier
     fn help(&self) -> &'static str;
     /// Given the command line text, construct the specifier
-    /// arg is what comes after the colon (e.g. `//echo.websocket.org` in `ws://echo.websocket.org`)
+    /// arg is what comes after the colon (e.g. `//echo.websocket.org` in
+    /// `ws://echo.websocket.org`)
     fn construct(&self, arg: &str) -> Result<Rc<dyn Specifier>>;
     /// Given the inner specifier, construct this specifier.
     fn construct_overlay(&self, inner: Rc<dyn Specifier>) -> Result<Rc<dyn Specifier>>;
@@ -37,7 +40,8 @@ pub trait SpecifierClass: std::fmt::Debug {
     fn message_boundary_status(&self) -> ClassMessageBoundaryStatus;
 
     fn multiconnect_status(&self) -> ClassMulticonnectStatus;
-    /// If it is Some then is_overlay, construct and most other things are ignored and prefix get replaced...
+    /// If it is Some then is_overlay, construct and most other things are
+    /// ignored and prefix get replaced...
     fn alias_info(&self) -> Option<&'static str>;
 }
 
@@ -165,7 +169,6 @@ macro_rules! specifier_class {
     };
 }
 
-
 #[derive(Debug)]
 pub struct SpecifierNode {
     pub cls: Rc<dyn SpecifierClass>,
@@ -198,8 +201,8 @@ impl ConstructParams {
             L2rUser::ReadFrom(_) => panic!("ConstructParams::reset_l2r called wrong"),
         }
     }
-    /// Clones ConstructParams, changing FillIn to ReadFrom in left_to_right field
-    /// and also disassociating it from the original RefCell.
+    /// Clones ConstructParams, changing FillIn to ReadFrom in left_to_right
+    /// field and also disassociating it from the original RefCell.
     ///
     /// Panics when called on object with left_to_right set to ReadFrom.
     pub fn reply(&self) -> Self {
@@ -231,15 +234,13 @@ impl ConstructParams {
     }
 
     /// Access specified-specific global (singleton) data
-    pub fn global<T:std::any::Any, F>(&self, def:F) -> std::cell::RefMut<T> 
-        where F : FnOnce()->T
+    pub fn global<T: std::any::Any, F>(&self, def: F) -> std::cell::RefMut<T>
+    where
+        F: FnOnce() -> T,
     {
-        std::cell::RefMut::map(
-            self.global_state.borrow_mut(),
-            |x|{
-                x.0.entry::<T>().or_insert_with(def)
-            }
-        )
+        std::cell::RefMut::map(self.global_state.borrow_mut(), |x| {
+            x.0.entry::<T>().or_insert_with(def)
+        })
     }
 }
 
@@ -247,7 +248,8 @@ impl ConstructParams {
 /// For example, `ws-listen:tcp-l:127.0.0.1:8080` gets parsed into
 /// a `WsUpgrade(TcpListen(SocketAddr))`.
 pub trait Specifier: std::fmt::Debug {
-    /// Apply the specifier for constructing a "socket" or other connecting device.
+    /// Apply the specifier for constructing a "socket" or other connecting
+    /// device.
     fn construct(&self, p: ConstructParams) -> PeerConstructor;
 
     // Specified by `specifier_boilerplate!`:

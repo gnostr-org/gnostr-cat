@@ -1,16 +1,11 @@
-use futures::future::ok;
-
+use std::io::{Error as IoError, Read};
 use std::rc::Rc;
 
-use crate::peer_strerr;
-
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::Read;
+use futures::future::ok;
 use tokio_io::AsyncRead;
 
-use std::io::Error as IoError;
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
+use crate::peer_strerr;
 
 pub type Counter = std::rc::Rc<std::cell::Cell<usize>>;
 
@@ -94,8 +89,7 @@ type F = unsafe extern "C" fn(
 pub type Sym = libloading::Symbol<'static, F>;
 
 pub fn load_symbol(spec: &str) -> crate::Result<Sym> {
-    let (libname, symname) =
-    if let Some((before, after)) = spec.split_once('@') {
+    let (libname, symname) = if let Some((before, after)) = spec.split_once('@') {
         (after, before)
     } else {
         (spec, "websocat_transform")
@@ -108,7 +102,11 @@ pub fn load_symbol(spec: &str) -> crate::Result<Sym> {
     Ok(s)
 }
 
-pub fn transform_peer(inner_peer: Peer, s: Option<Sym>, conn_seqn_counter: Counter) -> BoxedNewPeerFuture {
+pub fn transform_peer(
+    inner_peer: Peer,
+    s: Option<Sym>,
+    conn_seqn_counter: Counter,
+) -> BoxedNewPeerFuture {
     if s.is_none() {
         return peer_strerr("Symbol for native_plugin_transform_... is not specified");
     }
@@ -116,7 +114,7 @@ pub fn transform_peer(inner_peer: Peer, s: Option<Sym>, conn_seqn_counter: Count
     let s = s.unwrap();
 
     let conn_seqn = conn_seqn_counter.get();
-    conn_seqn_counter.set(conn_seqn+1);
+    conn_seqn_counter.set(conn_seqn + 1);
 
     unsafe { (s)(std::ptr::null_mut(), 0, 0, conn_seqn, 0) };
 
@@ -127,7 +125,6 @@ pub fn transform_peer(inner_peer: Peer, s: Option<Sym>, conn_seqn_counter: Count
         conn_seqn,
     };
     let thepeer = Peer::new(filtered_r, inner_peer.1, inner_peer.2);
-
 
     Box::new(ok(thepeer)) as BoxedNewPeerFuture
 }
@@ -164,13 +161,12 @@ impl Drop for TransformPeer {
     }
 }
 
-
 #[no_mangle]
 pub extern "C" fn websocat_log(severity: libc::c_int, data: *const u8, len: usize) {
     let s = unsafe { std::slice::from_raw_parts(data, len) };
     let s = unsafe { std::str::from_utf8_unchecked(s) };
     let level = match severity {
-        x if x<=1 => log::Level::Error,
+        x if x <= 1 => log::Level::Error,
         2 => log::Level::Warn,
         3 => log::Level::Info,
         4 => log::Level::Debug,

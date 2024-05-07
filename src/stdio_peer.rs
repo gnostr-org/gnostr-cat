@@ -5,24 +5,22 @@ extern crate tokio_reactor;
 extern crate tokio_signal;
 extern crate tokio_stdin_stdout;
 
-use futures;
-use futures::future::Future;
-use std;
 use std::cell::RefCell;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
+use std::fs::{File as FsFile, OpenOptions};
+use std::io::{Read, Result as IoResult, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+
+use futures::future::Future;
+use futures::Stream;
 use tokio_io::{AsyncRead, AsyncWrite};
+use {futures, std};
 
 #[cfg(unix)]
 use self::tokio_file_unix::File as UnixFile;
-use std::fs::{File as FsFile, OpenOptions};
-
-use super::{BoxedNewPeerFuture, Peer, Result};
-use futures::Stream;
-
-use super::{once, spawn_hack, ConstructParams, PeerConstructor, Specifier};
+use super::{
+    once, spawn_hack, BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Result, Specifier,
+};
 
 #[derive(Clone, Debug)]
 pub struct AsyncStdio;
@@ -58,7 +56,6 @@ Example: SSH transport
     ssh -c ProxyCommand='websocat asyncstdio: ws://myserver/mywebsocket' user@myserver
 "#
 );
-
 
 specifier_class!(
     name = InetdClass,

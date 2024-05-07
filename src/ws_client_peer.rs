@@ -1,21 +1,20 @@
 extern crate hyper;
 extern crate websocket;
 
-use self::websocket::client::r#async::ClientNew;
-use self::websocket::stream::r#async::Stream as WsStream;
-use self::websocket::ClientBuilder;
-use futures::future::Future;
-
 use std::rc::Rc;
 
-use self::websocket::client::Url;
-
-use super::{box_up_err, peer_err, peer_strerr, BoxedNewPeerFuture, Peer, Result};
-
-use super::ws_peer::PeerForWs;
-use super::{once, ConstructParams, Options, PeerConstructor, Specifier};
+use futures::future::Future;
 
 use self::hyper::header::Headers;
+use self::websocket::client::r#async::ClientNew;
+use self::websocket::client::Url;
+use self::websocket::stream::r#async::Stream as WsStream;
+use self::websocket::ClientBuilder;
+use super::ws_peer::PeerForWs;
+use super::{
+    box_up_err, once, peer_err, peer_strerr, BoxedNewPeerFuture, ConstructParams, Options, Peer,
+    PeerConstructor, Result, Specifier,
+};
 
 #[derive(Debug, Clone)]
 pub struct WsClient(pub Url);
@@ -163,7 +162,9 @@ where
     } else {
         stage4
     };
-    let stage6 = stage5.max_dataframe_size(opts.max_ws_frame_length).max_message_size(opts.max_ws_message_length);
+    let stage6 = stage5
+        .max_dataframe_size(opts.max_ws_frame_length)
+        .max_message_size(opts.max_ws_message_length);
     let after_connect = match f(stage6) {
         Ok(x) => x,
         Err(_) => return peer_strerr("Failed to make TLS connector"),

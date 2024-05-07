@@ -1,24 +1,22 @@
 extern crate net2;
 
-use futures;
+use std::cell::RefCell;
+use std::io::{Read, Result as IoResult, Write};
+use std::net::SocketAddr;
+use std::rc::Rc;
+
 use futures::future::Future;
 use futures::stream::Stream;
 use futures::unsync::oneshot::{channel, Receiver, Sender};
-use std;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
-use std::net::SocketAddr;
 use tokio_io::{AsyncRead, AsyncWrite};
-
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use tokio_tcp::{TcpListener, TcpStream};
 use tokio_udp::UdpSocket;
+use {futures, std};
 
-use super::L2rUser;
-use super::{box_up_err, peer_err_s, wouldblock, BoxedNewPeerFuture, BoxedNewPeerStream, Peer};
-use super::{multi, once, ConstructParams, Options, PeerConstructor, Specifier};
+use super::{
+    box_up_err, multi, once, peer_err_s, wouldblock, BoxedNewPeerFuture, BoxedNewPeerStream,
+    ConstructParams, L2rUser, Options, Peer, PeerConstructor, Specifier,
+};
 
 #[derive(Debug, Clone)]
 pub struct TcpConnect(pub Vec<SocketAddr>);
@@ -54,7 +52,11 @@ Example: redirect websocket connections to local SSH server over IPv6
 pub struct TcpListen(pub SocketAddr);
 impl Specifier for TcpListen {
     fn construct(&self, p: ConstructParams) -> PeerConstructor {
-        multi(tcp_listen_peer(&self.0, p.left_to_right, p.program_options.announce_listens))
+        multi(tcp_listen_peer(
+            &self.0,
+            p.left_to_right,
+            p.program_options.announce_listens,
+        ))
     }
     specifier_boilerplate!(noglobalstate multiconnect no_subspec );
 }
@@ -204,38 +206,41 @@ pub fn tcp_connect_peer(addrs: &[SocketAddr]) -> BoxedNewPeerFuture {
         let addr = addr.clone();
         fu.push(
             TcpStream::connect(&addr)
-            .map(move |x| {
-                info!("Connected to TCP {}", addr);
-                let x = Rc::new(x);
-                Peer::new(
-                    MyTcpStream(x.clone(), true),
-                    MyTcpStream(x.clone(), false),
-                    None /* TODO */
-                )
-            })
-            .map_err(box_up_err)
+                .map(move |x| {
+                    info!("Connected to TCP {}", addr);
+                    let x = Rc::new(x);
+                    Peer::new(
+                        MyTcpStream(x.clone(), true),
+                        MyTcpStream(x.clone(), false),
+                        None, /* TODO */
+                    )
+                })
+                .map_err(box_up_err),
         );
     }
-    // reverse Ok and Err variants so that `fold` would exit early on a successful connection, but accumulate errors.
-    let p = fu.then(|x| {
-        let reversed = match x {
+    // reverse Ok and Err variants so that `fold` would exit early on a successful
+    // connection, but accumulate errors.
+    let p = fu
+        .then(|x| {
+            let reversed = match x {
+                Ok(a) => Err(a),
+                Err(a) => Ok(a),
+            };
+            futures::future::done(reversed)
+        })
+        .fold(None, |_accum, e| {
+            log::info!("Failure during connecting TCP: {}", e);
+            futures::future::ok(Some(e))
+        })
+        .then(|x| match x {
             Ok(a) => Err(a),
             Err(a) => Ok(a),
-        };
-        futures::future::done(reversed)
-    }).fold(None, |_accum, e|{
-        log::info!("Failure during connecting TCP: {}", e);
-        futures::future::ok(Some(e))
-    }).then(|x| {
-        match x {
-            Ok(a) => Err(a),
-            Err(a) => Ok(a),
-        }
-    }).map_err(|e : Option<_>| e.unwrap());
+        })
+        .map_err(|e: Option<_>| e.unwrap());
     /*let p = fu.into_future().and_then(|(x, _losers)| {
         let peer = x.unwrap();
         debug!("We have a winner. Disconnecting losers.");
-        futures::future::ok(peer)       
+        futures::future::ok(peer)
     });*/
     //Box::new(p.map_err(|(e,_)|e)) as BoxedNewPeerFuture
     Box::new(p) as BoxedNewPeerFuture
@@ -303,7 +308,7 @@ fn get_zero_address(addr: &SocketAddr) -> SocketAddr {
     SocketAddr::new(ip, 0)
 }
 
-fn apply_udp_options(s: &UdpSocket, opts:&Rc<Options>) -> IoResult<()> {
+fn apply_udp_options(s: &UdpSocket, opts: &Rc<Options>) -> IoResult<()> {
     if opts.udp_broadcast {
         s.set_broadcast(true)?;
     }
@@ -313,7 +318,8 @@ fn apply_udp_options(s: &UdpSocket, opts:&Rc<Options>) -> IoResult<()> {
     let mut v4ai = opts.udp_join_multicast_iface_v4.iter();
     let mut v6ai = opts.udp_join_multicast_iface_v6.iter();
 
-    let use_ai = opts.udp_join_multicast_iface_v4.len() + opts.udp_join_multicast_iface_v6.len() > 0;
+    let use_ai =
+        opts.udp_join_multicast_iface_v4.len() + opts.udp_join_multicast_iface_v6.len() > 0;
 
     for multicast_address in opts.udp_join_multicast_addr.iter() {
         match multicast_address {
@@ -325,14 +331,10 @@ fn apply_udp_options(s: &UdpSocket, opts:&Rc<Options>) -> IoResult<()> {
                     std::net::Ipv4Addr::UNSPECIFIED
                 };
                 s.join_multicast_v4(a, &interface_address)?;
-            },
+            }
             std::net::IpAddr::V6(a) => {
                 multicast_v6 = true;
-                let interface_index = if use_ai {
-                    *v6ai.next().unwrap()
-                } else {
-                    0
-                };
+                let interface_index = if use_ai { *v6ai.next().unwrap() } else { 0 };
                 s.join_multicast_v6(a, interface_index)?;
             }
         }

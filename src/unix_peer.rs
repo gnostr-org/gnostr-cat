@@ -3,25 +3,24 @@ extern crate tokio_uds;
 
 extern crate libc;
 
-use futures;
-use futures::stream::Stream;
-use std;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
-use tokio_io::{AsyncRead, AsyncWrite};
-
 use std::cell::RefCell;
+use std::io::{Read, Result as IoResult, Write};
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use std::path::{Path, PathBuf};
+use futures::stream::Stream;
+use tokio_io::{AsyncRead, AsyncWrite};
+use {futures, std};
 
 use self::tokio_uds::{UnixDatagram, UnixListener, UnixStream};
-
 //#[cfg_attr(feature="cargo-clippy",allow(unused_imports))]
 #[allow(unused_imports)]
 use super::simple_err;
-use super::{box_up_err, peer_err_s, util::peer_err_sb, BoxedNewPeerFuture, BoxedNewPeerStream, Peer};
-use super::{multi, once, ConstructParams, Options, PeerConstructor, Specifier};
+use super::util::peer_err_sb;
+use super::{
+    box_up_err, multi, once, peer_err_s, BoxedNewPeerFuture, BoxedNewPeerStream, ConstructParams,
+    Options, Peer, PeerConstructor, Specifier,
+};
 
 #[derive(Debug, Clone)]
 pub struct UnixConnect(pub PathBuf);
@@ -194,10 +193,7 @@ so non-prebuilt versions may have problems with them.
 pub struct AbstractListen(pub String);
 impl Specifier for AbstractListen {
     fn construct(&self, cp: ConstructParams) -> PeerConstructor {
-        multi(unix_listen_peer(
-            &to_abstract(&self.0),
-            &cp.program_options,
-        ))
+        multi(unix_listen_peer(&to_abstract(&self.0), &cp.program_options))
     }
     specifier_boilerplate!(noglobalstate multiconnect no_subspec);
 }
@@ -254,7 +250,10 @@ specifier_class!(
     target = AbstractDgram,
     prefixes = ["abstract-dgram:"],
     arg_handling = {
-        fn construct(self: &AbstractDgramClass, just_arg: &str) -> super::Result<Rc<dyn Specifier>> {
+        fn construct(
+            self: &AbstractDgramClass,
+            just_arg: &str,
+        ) -> super::Result<Rc<dyn Specifier>> {
             let splits: Vec<&str> = just_arg.split(':').collect();
             if splits.len() != 2 {
                 Err("Expected two colon-separated addresses")?;
@@ -339,7 +338,7 @@ pub fn unix_connect_peer(addr: &Path) -> BoxedNewPeerFuture {
                 Peer::new(
                     MyUnixStream(x.clone(), true),
                     MyUnixStream(x.clone(), false),
-                    None /* TODO */,
+                    None, /* TODO */
                 )
             })
             .map_err(box_up_err),
@@ -349,18 +348,18 @@ pub fn unix_connect_peer(addr: &Path) -> BoxedNewPeerFuture {
 pub fn unix_listen_peer(addr: &Path, opts: &Rc<Options>) -> BoxedNewPeerStream {
     let bound = if opts.unix_socket_accept_from_fd {
         // Special mode for SystemD (untested yet)
-        let fdnum: libc::c_int = match addr.to_str().map(|x|x.parse()) {
+        let fdnum: libc::c_int = match addr.to_str().map(|x| x.parse()) {
             Some(Ok(x)) => x,
             _ => {
-                let e: Box<dyn std::error::Error> = From::from("Specify numeric argument instead of path in --accept-from-fd mode");
+                let e: Box<dyn std::error::Error> =
+                    From::from("Specify numeric argument instead of path in --accept-from-fd mode");
                 return peer_err_sb(e);
             }
         };
         use std::os::unix::io::FromRawFd;
-        let l = unsafe { std::os::unix::net::UnixListener::from_raw_fd(fdnum) } ;
+        let l = unsafe { std::os::unix::net::UnixListener::from_raw_fd(fdnum) };
         let _ = l.set_nonblocking(true);
-        let bound =
-        UnixListener::from_std(l, &tokio_reactor::Handle::default());
+        let bound = UnixListener::from_std(l, &tokio_reactor::Handle::default());
         bound
     } else {
         if opts.unlink_unix_socket {
@@ -371,7 +370,10 @@ pub fn unix_listen_peer(addr: &Path, opts: &Rc<Options>) -> BoxedNewPeerStream {
             let poss = addr.as_os_str();
             use std::os::unix::ffi::OsStrExt;
             if !poss.is_empty() && poss.as_bytes()[0] == b'\0' {
-                println!("LISTEN proto=abstract,path_hex={}", hex::encode(&poss.as_bytes()[1..]));
+                println!(
+                    "LISTEN proto=abstract,path_hex={}",
+                    hex::encode(&poss.as_bytes()[1..])
+                );
             } else {
                 println!("LISTEN proto=unix,path={:?}", addr);
             }
@@ -395,7 +397,7 @@ pub fn unix_listen_peer(addr: &Path, opts: &Rc<Options>) -> BoxedNewPeerStream {
                 Peer::new(
                     MyUnixStream(x.clone(), true),
                     MyUnixStream(x.clone(), false),
-                    None /* TODO */,
+                    None, /* TODO */
                 )
             })
             .map_err(|()| crate::simple_err2("unreachable error?")),
@@ -436,12 +438,13 @@ pub fn dgram_peer_workaround(
 ) -> BoxedNewPeerFuture {
     info!("Workaround method for getting abstract datagram socket");
     fn getfd(bindaddr: &Path, connectaddr: &Path) -> Option<i32> {
+        use std::mem::size_of;
+        use std::os::unix::ffi::OsStrExt;
+
         use self::libc::{
             bind, c_char, close, connect, sa_family_t, sockaddr_un, socket, socklen_t, AF_UNIX,
             SOCK_DGRAM,
         };
-        use std::mem::size_of;
-        use std::os::unix::ffi::OsStrExt;
         unsafe {
             let s = socket(AF_UNIX, SOCK_DGRAM, 0);
             if s == -1 {

@@ -1,7 +1,8 @@
-use super::{Result};
-use super::specifier::{Specifier, SpecifierClass, SpecifierStack, SpecifierNode};
 use std::rc::Rc;
 use std::str::FromStr;
+
+use super::specifier::{Specifier, SpecifierClass, SpecifierNode, SpecifierStack};
+use super::Result;
 
 pub fn spec(s: &str) -> Result<Rc<dyn Specifier>> {
     <dyn Specifier>::from_stack(&SpecifierStack::from_str(s)?)
@@ -11,7 +12,11 @@ fn some_checks(s: &str) -> Result<()> {
     #[cfg(not(feature = "ssl"))]
     {
         if s.starts_with("wss://") {
-            Err("SSL is not compiled in. Use ws:// or get/make another Websocat build.\nYou can also try to workaround missing SSL by using ws-c:cmd:socat trick (see some ws-c: example)")?
+            Err(
+                "SSL is not compiled in. Use ws:// or get/make another Websocat build.\nYou can \
+                 also try to workaround missing SSL by using ws-c:cmd:socat trick (see some ws-c: \
+                 example)",
+            )?
         }
     }
 
@@ -23,7 +28,10 @@ fn some_checks(s: &str) -> Result<()> {
     }
 
     if s.starts_with("open:") {
-        return Err("There is no `open:` address type. Consider `open-async:` or `readfile:` or `writefile:` or `appendfile:`")?;
+        return Err(
+            "There is no `open:` address type. Consider `open-async:` or `readfile:` or \
+             `writefile:` or `appendfile:`",
+        )?;
     }
 
     #[cfg(not(unix))]
@@ -82,13 +90,13 @@ impl FromStr for SpecifierStack {
                                 continue 'a;
                             } else if $x.is_overlay() {
                                 let cls = Rc::new($x) as Rc<dyn SpecifierClass>;
-                                overlays.push(SpecifierNode{cls});
+                                overlays.push(SpecifierNode { cls });
                                 s = rest.to_string();
                                 continue 'a;
                             } else {
                                 addr = rest.to_string();
                                 let cls = Rc::new($x) as Rc<dyn SpecifierClass>;
-                                addrtype = SpecifierNode{cls};
+                                addrtype = SpecifierNode { cls };
                                 #[allow(unused_assignments)]
                                 {
                                     found = true;
@@ -107,7 +115,11 @@ impl FromStr for SpecifierStack {
                         &s[..colon]
                     ))?;
                 } else {
-                    Err(format!("Unknown address or overlay type of `{}`\nMaybe you forgot the `:` character?", s))?;
+                    Err(format!(
+                        "Unknown address or overlay type of `{}`\nMaybe you forgot the `:` \
+                         character?",
+                        s
+                    ))?;
                 }
             }
         }

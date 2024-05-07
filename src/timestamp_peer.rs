@@ -1,15 +1,11 @@
-use futures::future::ok;
-
+use std::io::{Error as IoError, Read};
 use std::rc::Rc;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-use std::time::{SystemTime, UNIX_EPOCH, Instant};
-
-use std::io::Read;
+use futures::future::ok;
 use tokio_io::AsyncRead;
 
-use std::io::Error as IoError;
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
 
 #[derive(Debug)]
 pub struct TimestampPeer<T: Specifier>(pub T);
@@ -37,7 +33,11 @@ Example: TODO
 );
 
 pub fn timestamp_peer(inner_peer: Peer, monotonic: bool) -> BoxedNewPeerFuture {
-    let instant = if monotonic { Some(Instant::now() )} else { None };
+    let instant = if monotonic {
+        Some(Instant::now())
+    } else {
+        None
+    };
     let filtered = TimestampWrapper(inner_peer.0, instant);
     let thepeer = Peer::new(filtered, inner_peer.1, inner_peer.2);
     Box::new(ok(thepeer)) as BoxedNewPeerFuture
@@ -63,12 +63,15 @@ impl Read for TimestampWrapper {
             let x = if let Some(basetime) = self.1 {
                 Instant::now().duration_since(basetime).as_secs_f64()
             } else {
-                (SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards")).as_secs_f64()
+                (SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards"))
+                .as_secs_f64()
             };
             let _ = write!(vv, "{} ", x);
             let _ = vv.write_all(&b[..n]);
         }
-        
+
         if v.len() as usize > l {
             warn!("Buffer too small, timstamp-prepended message may be truncated.");
         }

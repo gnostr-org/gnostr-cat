@@ -1,18 +1,17 @@
+use std::fs::File;
+use std::rc::Rc;
+
+use futures::future::Future;
+
 use self::hyper::http::h1::Incoming;
 use self::hyper::method::Method;
 use self::hyper::uri::RequestUri;
 use self::hyper::uri::RequestUri::AbsolutePath;
 use super::hyper;
-
-use futures::future::Future;
-use std::fs::File;
-use std::rc::Rc;
-
+use crate::my_copy::{copy, CopyOptions};
 use crate::options::StaticFile;
 use crate::trivial_peer::get_literal_peer_now;
 use crate::Peer;
-
-use crate::my_copy::{copy, CopyOptions};
 
 const BAD_REQUEST :&[u8] = b"HTTP/1.1 400 Bad Request\r\nServer: websocat\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nOnly WebSocket connections are welcome here\n";
 

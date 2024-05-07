@@ -1,22 +1,18 @@
-use super::{BoxedNewPeerFuture, Peer};
-
-use super::{brokenpipe, io_other_error, wouldblock};
-use futures;
-use futures::sink::Sink;
-use futures::stream::Stream;
-use std;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
-
-use futures::Async::{NotReady, Ready};
+use std::io::{Read, Result as IoResult, Write};
 use std::rc::Rc;
 
+use futures::sink::Sink;
+use futures::stream::Stream;
 use futures::sync::mpsc;
-
+use futures::Async::{NotReady, Ready};
 use tokio_io::{AsyncRead, AsyncWrite};
+use {futures, std};
 
 use super::readdebt::{DebtHandling, ProcessMessageResult, ReadDebt, ZeroMessagesHandling};
-use super::{once, ConstructParams, PeerConstructor, Specifier};
+use super::{
+    brokenpipe, io_other_error, once, wouldblock, BoxedNewPeerFuture, ConstructParams, Peer,
+    PeerConstructor, Specifier,
+};
 
 #[derive(Debug, Clone)]
 pub struct Mirror;
@@ -83,7 +79,11 @@ struct MirrorRead {
 pub fn get_mirror_peer(debt_handling: DebtHandling) -> BoxedNewPeerFuture {
     let (sender, receiver) = mpsc::channel::<Vec<u8>>(0);
     let r = MirrorRead {
-        debt: ReadDebt(Default::default(), debt_handling, ZeroMessagesHandling::Deliver),
+        debt: ReadDebt(
+            Default::default(),
+            debt_handling,
+            ZeroMessagesHandling::Deliver,
+        ),
         ch: receiver,
     };
     let w = MirrorWrite(sender);
@@ -93,7 +93,11 @@ pub fn get_mirror_peer(debt_handling: DebtHandling) -> BoxedNewPeerFuture {
 pub fn get_literal_reply_peer(content: Vec<u8>) -> BoxedNewPeerFuture {
     let (sender, receiver) = mpsc::channel::<()>(0);
     let r = LiteralReplyRead {
-        debt: ReadDebt(Default::default(), DebtHandling::Silent, ZeroMessagesHandling::Deliver),
+        debt: ReadDebt(
+            Default::default(),
+            DebtHandling::Silent,
+            ZeroMessagesHandling::Deliver,
+        ),
         ch: receiver,
         content,
     };

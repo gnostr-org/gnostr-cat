@@ -1,17 +1,15 @@
-use futures::future::ok;
-
+use std::cell::RefCell;
+use std::io::{Error as IoError, Read, Write};
 use std::rc::Rc;
 
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::cell::RefCell;
-
-use std::io::{Error as IoError, Read, Write};
+use futures::future::ok;
+use futures::{Async, Future, Poll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use super::{once, simple_err, wouldblock};
-use futures::{Async, Future, Poll};
+use super::{
+    once, simple_err, wouldblock, BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor,
+    Specifier,
+};
 
 #[derive(Debug)]
 pub struct Foreachmsg(pub Rc<dyn Specifier>);
@@ -72,7 +70,8 @@ struct State {
     need_wait_for_reading: bool,
 }
 
-/// This implementation's poll is to be reused many times, both after returning item and error
+/// This implementation's poll is to be reused many times, both after returning
+/// item and error
 impl State {
     //type Item = &'mut Peer;
     //type Error = Box<::std::error::Error>;
@@ -166,7 +165,7 @@ impl Read for PeerHandle {
                     }
                 }
             }
-            let p : &mut Peer = match state.poll() {
+            let p: &mut Peer = match state.poll() {
                 Ok(Async::Ready(p)) => p,
                 Ok(Async::NotReady) => return wouldblock(),
                 Err(e) => {
@@ -176,7 +175,7 @@ impl Read for PeerHandle {
             #[allow(unused_assignments)]
             let mut finished_but_loop_around = false;
             match p.0.read(b) {
-                Ok(0) => { 
+                Ok(0) => {
                     state.finished_reading = true;
                     if state.need_wait_for_reading {
                         finished_but_loop_around = true;
@@ -204,7 +203,7 @@ impl Read for PeerHandle {
             }
             if finished_but_loop_around {
                 state.finished_reading = true;
-                let (tx,rx) = futures::sync::oneshot::channel();
+                let (tx, rx) = futures::sync::oneshot::channel();
                 state.wait_for_new_peer_tx = Some(tx);
                 state.wait_for_new_peer_rx = Some(rx);
                 if let Some(rw) = state.read_waiter_tx.take() {
@@ -219,7 +218,7 @@ impl AsyncRead for PeerHandle {}
 impl Write for PeerHandle {
     fn write(&mut self, b: &[u8]) -> Result<usize, IoError> {
         let mut state = self.0.borrow_mut();
-        
+
         let mut do_reconnect = false;
         let mut finished = false;
         loop {
@@ -238,7 +237,7 @@ impl Write for PeerHandle {
                     match ph {
                         Phase::Idle => {
                             match p.1.write(b) {
-                                Ok(0) => { 
+                                Ok(0) => {
                                     info!("End-of-file write?");
                                     return Ok(0);
                                 }
@@ -253,7 +252,7 @@ impl Write for PeerHandle {
                                     debug!("Full write");
                                     // A successful write. Flushing and closing the peer.
                                     ph = Phase::Flushing;
-                                },
+                                }
                                 Ok(x) => {
                                     debug!("Partial write of {} bytes", x);
                                     // A partial write. Creating write debt.
@@ -261,10 +260,10 @@ impl Write for PeerHandle {
                                     ph = Phase::WriteDebt(debt);
                                 }
                             }
-                        },
+                        }
                         Phase::WriteDebt(d) => {
                             match p.1.write(&d[..]) {
-                                Ok(0) => { 
+                                Ok(0) => {
                                     info!("End-of-file write v2?");
                                     return Ok(0);
                                 }
@@ -279,7 +278,7 @@ impl Write for PeerHandle {
                                     debug!("Closing the debt");
                                     // A successful write. Flushing and closing the peer.
                                     ph = Phase::Flushing;
-                                },
+                                }
                                 Ok(x) => {
                                     debug!("Partial write of {} debt bytes", x);
                                     // A partial write. Retaining the write debt.
@@ -287,50 +286,49 @@ impl Write for PeerHandle {
                                     ph = Phase::WriteDebt(debt);
                                 }
                             }
-                        },
-                        Phase::Flushing => {
-                            match p.1.flush() {
-                                Err(e) => {
-                                    if e.kind() == ::std::io::ErrorKind::WouldBlock {
-                                        return Err(e);
-                                    }
-                                    warn!("{}", e);
+                        }
+                        Phase::Flushing => match p.1.flush() {
+                            Err(e) => {
+                                if e.kind() == ::std::io::ErrorKind::WouldBlock {
                                     return Err(e);
                                 }
-                                Ok(()) => {
-                                    debug!("Flushed");
-                                    ph = Phase::Closing;
-                                }
+                                warn!("{}", e);
+                                return Err(e);
+                            }
+                            Ok(()) => {
+                                debug!("Flushed");
+                                ph = Phase::Closing;
                             }
                         },
-                        Phase::Closing => {
-                            match p.1.shutdown() {
-                                Err(e) => {
-                                    if e.kind() == ::std::io::ErrorKind::WouldBlock {
-                                        return Err(e);
-                                    }
-                                    warn!("{}", e);
+                        Phase::Closing => match p.1.shutdown() {
+                            Err(e) => {
+                                if e.kind() == ::std::io::ErrorKind::WouldBlock {
                                     return Err(e);
-                                },
-                                Ok(Async::NotReady) => {
-                                    return wouldblock();
-                                },
-                                Ok(Async::Ready(())) => {
-                                    if state.need_wait_for_reading {
-                                        if state.finished_reading {
-                                            debug!("Closed and reading is also done");
-                                            finished=true;
-                                        } else {
-                                            debug!("Closed, but need to wait for other direction to finish");
-                                            ph = Phase::WaitingForReadToFinish;
-                                            let (tx,rx) = futures::sync::oneshot::channel();
-                                            state.read_waiter_tx = Some(tx);
-                                            state.read_waiter_rx = Some(rx);
-                                        }
+                                }
+                                warn!("{}", e);
+                                return Err(e);
+                            }
+                            Ok(Async::NotReady) => {
+                                return wouldblock();
+                            }
+                            Ok(Async::Ready(())) => {
+                                if state.need_wait_for_reading {
+                                    if state.finished_reading {
+                                        debug!("Closed and reading is also done");
+                                        finished = true;
                                     } else {
-                                        debug!("Closed");
-                                        finished=true;
+                                        debug!(
+                                            "Closed, but need to wait for other direction to \
+                                             finish"
+                                        );
+                                        ph = Phase::WaitingForReadToFinish;
+                                        let (tx, rx) = futures::sync::oneshot::channel();
+                                        state.read_waiter_tx = Some(tx);
+                                        state.read_waiter_rx = Some(rx);
                                     }
+                                } else {
+                                    debug!("Closed");
+                                    finished = true;
                                 }
                             }
                         },
@@ -341,7 +339,7 @@ impl Write for PeerHandle {
                                 }
                                 _ => {
                                     debug!("Waited for read to finish");
-                                    finished=true;
+                                    finished = true;
                                 }
                             }
                         }

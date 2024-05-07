@@ -1,22 +1,15 @@
-use argon2::Argon2;
-use futures::Async;
-use futures::future::ok;
-
+use std::io::{Error as IoError, Read, Write};
 use std::rc::Rc;
 
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::{Read, Write};
+use argon2::Argon2;
+use chacha20poly1305::aead::{Aead, NewAead};
+use chacha20poly1305::{ChaCha20Poly1305, Nonce};
+use futures::future::ok;
+use futures::Async;
+use rand::RngCore;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::io::Error as IoError;
-
-use chacha20poly1305::ChaCha20Poly1305;
-use chacha20poly1305::Nonce;
-use chacha20poly1305::aead::NewAead;
-use chacha20poly1305::aead::Aead;
-use rand::RngCore;
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
 
 #[derive(Debug)]
 pub struct Crypto<T: Specifier>(pub T);
@@ -27,7 +20,10 @@ impl<T: Specifier> Specifier for Crypto<T> {
         if let Some(k) = cp.program_options.crypto_key {
             key = k;
         } else {
-            log::error!("You are using `crypto:` without `--crypto-key`. This uses a hard coded key and is insecure.")
+            log::error!(
+                "You are using `crypto:` without `--crypto-key`. This uses a hard coded key and \
+                 is insecure."
+            )
         }
         inner.map(move |p, _| crypto_peer(p, key, cp.program_options.crypto_reverse))
     }
@@ -99,7 +95,9 @@ impl Read for CryptoWrapperR {
             Err(e) => return Err(e),
         };
 
-        if n == 0 { return Ok(0) }
+        if n == 0 {
+            return Ok(0);
+        }
 
         let data = process_data(&b[..n], &self.1, self.2)?;
 
@@ -141,30 +139,28 @@ impl AsyncWrite for CryptoWrapperW {
     }
 }
 
-fn process_data(buf: &[u8], crypto: &ChaCha20Poly1305, mode: Mode) -> Result<Vec<u8>, IoError>  {
+fn process_data(buf: &[u8], crypto: &ChaCha20Poly1305, mode: Mode) -> Result<Vec<u8>, IoError> {
     let l = buf.len();
     match mode {
         Mode::Encrypt => {
             let mut nonce = [0u8; 12];
             rand::thread_rng().fill_bytes(&mut nonce[..]);
-            let mut data: Vec<u8> = crypto
-                .encrypt(Nonce::from_slice(&nonce), &buf[..])
-                .unwrap();
+            let mut data: Vec<u8> = crypto.encrypt(Nonce::from_slice(&nonce), &buf[..]).unwrap();
             data.extend_from_slice(&nonce[..]);
             Ok(data)
         }
         Mode::Decrypt => {
             if l < 12 {
                 log::error!("Insufficient packet length for `crypto:` specifier's decryption");
-                return Err(std::io::ErrorKind::Other.into()); 
+                return Err(std::io::ErrorKind::Other.into());
             }
             let mut nonce = [0u8; 12];
-            nonce.copy_from_slice(&buf[l-12..l]);
-            match crypto.decrypt(Nonce::from_slice(&nonce), &buf[..(l-12)]) {
+            nonce.copy_from_slice(&buf[l - 12..l]);
+            match crypto.decrypt(Nonce::from_slice(&nonce), &buf[..(l - 12)]) {
                 Ok(x) => Ok(x),
                 Err(_) => {
                     log::error!("crypto: decryption failed");
-                    return Err(std::io::ErrorKind::Other.into())
+                    return Err(std::io::ErrorKind::Other.into());
                 }
             }
         }
@@ -181,7 +177,6 @@ pub fn interpret_opt(x: &str) -> crate::Result<[u8; 32]> {
             return Err("Non 32-byte buffer specified".into());
         }
         key.copy_from_slice(&buf[..]);
-
     } else if x.starts_with("file:") {
         let buf = std::fs::read(&x[5..])?;
         if buf.len() != 32 {
@@ -191,10 +186,14 @@ pub fn interpret_opt(x: &str) -> crate::Result<[u8; 32]> {
         key.copy_from_slice(&buf[..])
     } else if x.starts_with("pwd:") {
         let argon2 = Argon2::default();
-        const SALT : &'static [u8] = &[0x81, 0x65, 0x0c, 0xc7, 0x09, 0x76, 0xc1, 0x12, 0x6b, 0x5b, 0x5f, 0x04,
-        0x08, 0x61, 0xf6, 0x1b, 0xd6, 0xab, 0x88, 0xa2, 0xee, 0x67, 0x47, 0xc1,
-        0xbe, 0x12, 0xd7, 0xd7, 0x2d, 0xb8, 0x39, 0xcf];
-        argon2.hash_password_into(x[4..].as_bytes(),SALT,&mut key[..]).unwrap();
+        const SALT: &'static [u8] = &[
+            0x81, 0x65, 0x0c, 0xc7, 0x09, 0x76, 0xc1, 0x12, 0x6b, 0x5b, 0x5f, 0x04, 0x08, 0x61,
+            0xf6, 0x1b, 0xd6, 0xab, 0x88, 0xa2, 0xee, 0x67, 0x47, 0xc1, 0xbe, 0x12, 0xd7, 0xd7,
+            0x2d, 0xb8, 0x39, 0xcf,
+        ];
+        argon2
+            .hash_password_into(x[4..].as_bytes(), SALT, &mut key[..])
+            .unwrap();
     } else {
         return Err("--crypto-key's value must start with `base64:`, `file:` or `pwd:`".into());
     }

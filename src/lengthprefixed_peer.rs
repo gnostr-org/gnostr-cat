@@ -1,16 +1,11 @@
-use futures::future::ok;
-
+use std::io::{Error as IoError, Read, Write};
 use std::rc::Rc;
 
-use crate::{io_other_error, simple_err, peer_strerr};
-
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::{Read, Write};
+use futures::future::ok;
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::io::Error as IoError;
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
+use crate::{io_other_error, peer_strerr, simple_err};
 
 #[derive(Debug)]
 pub struct LengthPrefixed<T: Specifier>(pub T);
@@ -65,7 +60,9 @@ pub fn lengthprefixed_peer(
     little_endian: bool,
 ) -> BoxedNewPeerFuture {
     if num_bytes_in_length_prefix < 1 || num_bytes_in_length_prefix > 8 {
-        return peer_strerr("Number of header bytes for lengthprefixed overlay should be from 1 to 8");
+        return peer_strerr(
+            "Number of header bytes for lengthprefixed overlay should be from 1 to 8",
+        );
     }
 
     let (length_starting_pos, length_ending_pos) = if little_endian {
@@ -132,7 +129,10 @@ impl Read for Lengthprefixed2PacketWrapper {
                     u64::from_be_bytes(self.length_buffer)
                 };
                 if packet_len >= (buf.len() as u64) {
-                    error!("Failed to process too big packet. You may need to increase the -B buffer size.");
+                    error!(
+                        "Failed to process too big packet. You may need to increase the -B buffer \
+                         size."
+                    );
                     return Err(io_other_error(simple_err("Packet length overflow".into())));
                 }
                 let packet_len = packet_len as usize;

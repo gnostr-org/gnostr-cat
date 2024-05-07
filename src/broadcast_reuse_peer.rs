@@ -1,25 +1,21 @@
 extern crate futures;
 extern crate tokio_io;
 
-use futures::future::ok;
 use std::cell::RefCell;
+use std::io::{Error as IoError, Read, Write};
+use std::ops::DerefMut;
 use std::rc::Rc;
 
-use super::{brokenpipe, simple_err, wouldblock, BoxedNewPeerFuture, Peer};
-
-use std::io::{Error as IoError, Read, Write};
+use futures::future::ok;
+use futures::unsync::mpsc;
+use futures::{Async, AsyncSink, Future, Sink, Stream};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use super::{once, ConstructParams, PeerConstructor, Specifier};
-use futures::Async;
-use futures::AsyncSink;
-use futures::Future;
-use futures::Sink;
-use futures::Stream;
+use super::{
+    brokenpipe, once, simple_err, wouldblock, BoxedNewPeerFuture, ConstructParams, Peer,
+    PeerConstructor, Specifier,
+};
 use crate::spawn_hack;
-use std::ops::DerefMut;
-
-use futures::unsync::mpsc;
 
 declare_slab_token!(BroadcastClientIndex);
 use slab_typesafe::Slab;

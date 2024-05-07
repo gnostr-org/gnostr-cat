@@ -18,7 +18,11 @@ pub enum ProcessMessageResult {
 }
 
 /// A `Read` utility to deal with partial reads
-pub struct ReadDebt(pub Option<Vec<u8>>, pub DebtHandling, pub ZeroMessagesHandling);
+pub struct ReadDebt(
+    pub Option<Vec<u8>>,
+    pub DebtHandling,
+    pub ZeroMessagesHandling,
+);
 impl ReadDebt {
     pub fn process_message(&mut self, buf: &mut [u8], buf_in: &[u8]) -> ProcessMessageResult {
         assert_eq!(self.0, None);
@@ -27,10 +31,21 @@ impl ReadDebt {
             match self.1 {
                 DebtHandling::Silent => (),
                 DebtHandling::Warn => {
-                    warn!("Incoming message too long ({} > {}): splitting it to parts.\nUse -B option to increase buffer size or -S option to drop messages instead of splitting.", l, buf.len());
+                    warn!(
+                        "Incoming message too long ({} > {}): splitting it to parts.\nUse -B \
+                         option to increase buffer size or -S option to drop messages instead of \
+                         splitting.",
+                        l,
+                        buf.len()
+                    );
                 }
                 DebtHandling::DropMessage => {
-                    error!("Dropping too large message ({} > {}). Use -B option to increase buffer size.", l, buf.len());
+                    error!(
+                        "Dropping too large message ({} > {}). Use -B option to increase buffer \
+                         size.",
+                        l,
+                        buf.len()
+                    );
                     return ProcessMessageResult::Recurse;
                 }
             }

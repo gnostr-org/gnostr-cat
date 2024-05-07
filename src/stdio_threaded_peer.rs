@@ -1,10 +1,8 @@
 extern crate tokio_stdin_stdout;
 
-use super::{BoxedNewPeerFuture, Peer};
-
-use super::{once, ConstructParams, PeerConstructor, Specifier};
-
 use std::rc::Rc;
+
+use super::{once, BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
 
 #[derive(Debug, Clone)]
 pub struct ThreadedStdio;
@@ -54,7 +52,6 @@ Example: SSH transport
     ssh -c ProxyCommand='websocat - ws://myserver/mywebsocket' user@myserver
 "#
 );
-
 
 #[cfg(not(all(unix, feature = "unix_stdio")))]
 specifier_class!(

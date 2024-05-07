@@ -1,14 +1,10 @@
-use futures::future::ok;
-
+use std::io::{Error as IoError, Read};
 use std::rc::Rc;
 
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::Read;
+use futures::future::ok;
 use tokio_io::AsyncRead;
 
-use std::io::Error as IoError;
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
 
 #[derive(Debug)]
 pub struct JsonRpc<T: Specifier>(pub T);

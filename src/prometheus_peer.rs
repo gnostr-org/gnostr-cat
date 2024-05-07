@@ -1,23 +1,17 @@
-use futures::future::ok;
-use futures::{Async};
-use prometheus::core::{AtomicU64, Atomic};
-
 use std::cell::RefCell;
+use std::io::{Error as IoError, ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpListener};
 use std::rc::Rc;
 use std::time::Duration;
 
-use crate::ws_server_peer::http_serve::get_static_file_reply;
-
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::{Read, Write, ErrorKind};
+use futures::future::ok;
+use futures::Async;
+use prometheus::core::{Atomic, AtomicU64};
+use prometheus::{Encoder, Histogram, IntCounter};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::io::Error as IoError;
-
-use prometheus::{Encoder, IntCounter, Histogram};
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
+use crate::ws_server_peer::http_serve::get_static_file_reply;
 
 #[derive(prometheus_metric_storage::MetricStorage)]
 #[metric(subsystem = "websocat1")]
@@ -38,70 +32,87 @@ pub struct GlobalStats {
     /// Number of times `prometheus:` overlay's destructor was called
     disconnects: IntCounter,
 
-    /// Distribution of times between `prometheus:` overlay initiation and destruction
+    /// Distribution of times between `prometheus:` overlay initiation and
+    /// destruction
     #[metric(buckets(0.1, 1, 10, 60, 300, 3600))]
     session_durations: Histogram,
 
-    /// Distribution of times between one `prometheus:` overlay initiation and the next initiation
+    /// Distribution of times between one `prometheus:` overlay initiation and
+    /// the next initiation
     #[metric(buckets(0.1, 1, 10, 60, 300, 3600))]
     between_connects: Histogram,
 
-    /// Distribution of the number of total bytes written to the overlay per connection 
+    /// Distribution of the number of total bytes written to the overlay per
+    /// connection
     #[metric(buckets(0, 32, 1024, 65536, 1048576, 33554432, 1073741824))]
     session_w_bytes: Histogram,
 
-    /// Distribution of the number of total bytes read to the overlay per connection 
+    /// Distribution of the number of total bytes read to the overlay per
+    /// connection
     #[metric(buckets(0, 32, 1024, 65536, 1048576, 33554432, 1073741824))]
     session_r_bytes: Histogram,
 
-    /// Distribution of the number of total count of write function calls to the overlay per connection 
+    /// Distribution of the number of total count of write function calls to the
+    /// overlay per connection
     #[metric(buckets(0, 1, 2, 8, 64, 2048, 65536, 2097152))]
     session_w_msgs: Histogram,
 
-    /// Distribution of the number of total count of read function calls to the overlay per connection 
+    /// Distribution of the number of total count of read function calls to the
+    /// overlay per connection
     #[metric(buckets(0, 1, 2, 8, 64, 2048, 65536, 2097152))]
     session_r_msgs: Histogram,
 
-    /// Distribution of the `session_r_bytes` divided by `session_durations` values
+    /// Distribution of the `session_r_bytes` divided by `session_durations`
+    /// values
     #[metric(buckets(0.5, 10, 100, 1000, 1000_0, 1000_00, 1000_000, 10_000_000, 100_000_000))]
     session_avg_r_bps: Histogram,
 
-    /// Distribution of the `session_w_bytes` divided by `session_durations` values
+    /// Distribution of the `session_w_bytes` divided by `session_durations`
+    /// values
     #[metric(buckets(0.5, 10, 100, 1000, 1000_0, 1000_00, 1000_000, 10_000_000, 100_000_000))]
     session_avg_w_bps: Histogram,
 
-    /// Distribution of byte lengths underlying `read` function successfully returned
+    /// Distribution of byte lengths underlying `read` function successfully
+    /// returned
     #[metric(buckets(0, 1, 10, 50, 300, 1024, 8192, 65536, 4194304))]
     read_lengths: Histogram,
 
-    /// Number of times `read` function of the underlying specifier returned error (besides EAGAIN)
+    /// Number of times `read` function of the underlying specifier returned
+    /// error (besides EAGAIN)
     read_errors: IntCounter,
 
-    /// Number of times `read` function of the underlying specifier returned EAGAIN
+    /// Number of times `read` function of the underlying specifier returned
+    /// EAGAIN
     read_wouldblocks: IntCounter,
 
-    /// Number of times `write` function of the underlying specifier returned error (besides EAGAIN)
+    /// Number of times `write` function of the underlying specifier returned
+    /// error (besides EAGAIN)
     write_errors: IntCounter,
 
-    /// Number of times `write` function of the underlying specifier returned EAGAIN
+    /// Number of times `write` function of the underlying specifier returned
+    /// EAGAIN
     write_wouldblocks: IntCounter,
 
-    /// Distribution of byte lengths underlying `write` function successfully returned
+    /// Distribution of byte lengths underlying `write` function successfully
+    /// returned
     #[metric(buckets(0, 1, 10, 50, 300, 1024, 8192, 65536, 4194304))]
     write_lengths: Histogram,
 
     /// durations it took to make a function call to underlying node for reading
-    #[metric(buckets(0.1e-3,1e-3,0.01,0.1,1,10))]
+    #[metric(buckets(0.1e-3, 1e-3, 0.01, 0.1, 1, 10))]
     read_timings: Histogram,
 
     /// durations it took to make a function call to underlying node for writing
-    #[metric(buckets(0.1e-3,1e-3,0.01,0.1,1,10))]
+    #[metric(buckets(0.1e-3, 1e-3, 0.01, 0.1, 1, 10))]
     write_timings: Histogram,
 }
 
 pub type HGlobalStats = Rc<GlobalStats>;
 
-pub type GlobalState = (HGlobalStats, Rc<RefCell<Option<prometheus::HistogramTimer>>>);
+pub type GlobalState = (
+    HGlobalStats,
+    Rc<RefCell<Option<prometheus::HistogramTimer>>>,
+);
 
 struct Droppie {
     w_msgs: AtomicU64,
@@ -129,8 +140,12 @@ impl Droppie {
 impl Drop for Droppie {
     fn drop(&mut self) {
         let t = self.session_timing.take().unwrap().stop_and_record();
-        self.handle.session_r_bytes.observe(self.r_bytes.get() as f64);
-        self.handle.session_w_bytes.observe(self.w_bytes.get() as f64);
+        self.handle
+            .session_r_bytes
+            .observe(self.r_bytes.get() as f64);
+        self.handle
+            .session_w_bytes
+            .observe(self.w_bytes.get() as f64);
         self.handle.session_r_msgs.observe(self.r_msgs.get() as f64);
         self.handle.session_w_msgs.observe(self.w_msgs.get() as f64);
         let r_avg_bps = self.r_bytes.get() as f64 / t;
@@ -138,12 +153,14 @@ impl Drop for Droppie {
         self.handle.session_avg_r_bps.observe(r_avg_bps);
         self.handle.session_avg_w_bps.observe(w_avg_bps);
         self.handle.disconnects.inc();
-
     }
 }
 
 pub fn new_global_stats() -> GlobalState {
-    (Rc::new(GlobalStats::new(prometheus::default_registry()).unwrap()), Rc::new(RefCell::new(None)))
+    (
+        Rc::new(GlobalStats::new(prometheus::default_registry()).unwrap()),
+        Rc::new(RefCell::new(None)),
+    )
 }
 
 pub fn serve(psa: SocketAddr) -> crate::Result<()> {
@@ -153,7 +170,7 @@ pub fn serve(psa: SocketAddr) -> crate::Result<()> {
     std::thread::spawn(move || {
         for s in tcp.incoming() {
             if let Ok(s) = s {
-                let mut s = std::io::BufWriter::new(s); 
+                let mut s = std::io::BufWriter::new(s);
                 let stats = prometheus::default_registry().gather();
                 let header = get_static_file_reply(None, "text/plain; version=0.0.4");
                 let _ = s.write_all(&header[..]);
@@ -221,13 +238,13 @@ impl Read for StatsWrapperR {
                 self.1.handle.r_bytes.inc_by(*x as u64);
                 self.1.r_msgs.inc_by(1);
                 self.1.r_bytes.inc_by(*x as u64);
-            },
+            }
             Err(e) if e.kind() == ErrorKind::WouldBlock => {
                 self.1.handle.read_wouldblocks.inc();
-            },
+            }
             Err(_) => {
                 self.1.handle.read_errors.inc();
-            },
+            }
         };
 
         ret
@@ -242,7 +259,7 @@ impl Write for StatsWrapperW {
         let timer = self.1.handle.write_timings.start_timer();
         let ret = self.0.write(b);
         timer.stop_and_record();
-        
+
         match &ret {
             Ok(x) => {
                 self.1.handle.write_lengths.observe(*x as f64);
@@ -250,13 +267,13 @@ impl Write for StatsWrapperW {
                 self.1.handle.w_bytes.inc_by(*x as u64);
                 self.1.w_msgs.inc_by(1);
                 self.1.w_bytes.inc_by(*x as u64);
-            },
+            }
             Err(e) if e.kind() == ErrorKind::WouldBlock => {
                 self.1.handle.write_wouldblocks.inc();
-            },
+            }
             Err(_) => {
                 self.1.handle.write_errors.inc();
-            },
+            }
         };
 
         ret

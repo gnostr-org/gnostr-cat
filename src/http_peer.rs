@@ -1,26 +1,26 @@
-
 #![allow(unused)]
-#![cfg_attr(feature="cargo-clippy",allow(needless_pass_by_value,cast_lossless,identity_op))]
-use futures::future::{err, ok, Future};
-
-use std::rc::Rc;
-
-use super::{box_up_err, peer_strerr, BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, L2rUser, PeerConstructor, Specifier};
-use tokio_io::io::{read_exact, write_all};
-use tokio_io::{AsyncRead,AsyncWrite};
-
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(needless_pass_by_value, cast_lossless, identity_op)
+)]
+use std::ffi::OsString;
 use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr};
+use std::rc::Rc;
 
-use std::ffi::OsString;
+use futures::future::{err, ok, Future};
+use tokio_io::io::{read_exact, write_all};
+use tokio_io::{AsyncRead, AsyncWrite};
+
+use super::{
+    box_up_err, peer_strerr, BoxedNewPeerFuture, ConstructParams, L2rUser, Peer, PeerConstructor,
+    Specifier,
+};
 
 extern crate http_bytes;
-use http_bytes::http;
+use http_bytes::{http, Request, Response};
 
-use http_bytes::{Request,Response};
-use crate::http::Uri;
-use crate::http::Method;
+use crate::http::{Method, Uri};
 use crate::util::peer_err2;
 
 #[derive(Debug)]
@@ -97,7 +97,7 @@ specifier_class!(
     prefixes = ["http:"],
     arg_handling = {
         fn construct(self: &HttpClass, arg: &str) -> super::Result<Rc<dyn Specifier>> {
-            let uri : Uri = format!("http:{}", arg).parse()?;
+            let uri: Uri = format!("http:{}", arg).parse()?;
             let tcp_peer;
             {
                 let auth = uri.authority_part().unwrap();
@@ -136,9 +136,7 @@ Example:
 "#
 );
 
-
-
-#[derive(Copy,Clone,PartialEq,Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 enum HttpHeaderEndDetectionState {
     Neutral,
     FirstCr,
@@ -147,12 +145,11 @@ enum HttpHeaderEndDetectionState {
     FoundHeaderEnd,
 }
 
-struct WaitForHttpHead<R : AsyncRead>
-{
+struct WaitForHttpHead<R: AsyncRead> {
     buf: Option<Vec<u8>>,
-    offset : usize,
+    offset: usize,
     state: HttpHeaderEndDetectionState,
-    io : Option<R>,
+    io: Option<R>,
 }
 
 struct WaitForHttpHeadResult {
@@ -161,8 +158,8 @@ struct WaitForHttpHeadResult {
     offset: usize,
 }
 
-impl<R:AsyncRead> WaitForHttpHead<R> {
-    pub fn new(r:R) -> WaitForHttpHead<R> {
+impl<R: AsyncRead> WaitForHttpHead<R> {
+    pub fn new(r: R) -> WaitForHttpHead<R> {
         WaitForHttpHead {
             buf: Some(Vec::with_capacity(512)),
             offset: 0,
@@ -172,7 +169,7 @@ impl<R:AsyncRead> WaitForHttpHead<R> {
     }
 }
 
-impl<R:AsyncRead> Future for WaitForHttpHead<R> {
+impl<R: AsyncRead> Future for WaitForHttpHead<R> {
     type Item = (WaitForHttpHeadResult, R);
     type Error = Box<dyn std::error::Error>;
 
@@ -196,7 +193,7 @@ impl<R:AsyncRead> Future for WaitForHttpHead<R> {
             }
 
             // parse
-            for i in self.offset..(self.offset+ret) {
+            for i in self.offset..(self.offset + ret) {
                 let x = self.buf.as_ref().unwrap()[i];
                 use self::HttpHeaderEndDetectionState::*;
                 //eprint!("{:?} -> ", self.state);
@@ -213,7 +210,7 @@ impl<R:AsyncRead> Future for WaitForHttpHead<R> {
                     let mut buf = self.buf.take().unwrap();
                     buf.resize(self.offset + ret, 0u8);
                     return Ok(::futures::Async::Ready((
-                        WaitForHttpHeadResult { buf, offset: i+1},
+                        WaitForHttpHeadResult { buf, offset: i + 1 },
                         io,
                     )));
                 }
@@ -228,11 +225,7 @@ impl<R:AsyncRead> Future for WaitForHttpHead<R> {
     }
 }
 
-pub fn http_request_peer(
-    request: &Request,
-    inner_peer: Peer,
-    _l2r: L2rUser,
-) -> BoxedNewPeerFuture {
+pub fn http_request_peer(request: &Request, inner_peer: Peer, _l2r: L2rUser) -> BoxedNewPeerFuture {
     let request = ::http_bytes::request_header_to_vec(&request);
 
     let (r, w, hup) = (inner_peer.0, inner_peer.1, inner_peer.2);
@@ -241,12 +234,12 @@ pub fn http_request_peer(
     let f = ::tokio_io::io::write_all(w, request)
         .map_err(box_up_err)
         .and_then(move |(w, request)| {
-            WaitForHttpHead::new(r).and_then(|(res, r)|{
+            WaitForHttpHead::new(r).and_then(|(res, r)| {
                 debug!("Got HTTP response head");
-                let ret = (move||{
+                let ret = (move || {
                     {
                         let headbuf = &res.buf[0..res.offset];
-                        trace!("{:?}",headbuf);
+                        trace!("{:?}", headbuf);
                         let p = http_bytes::parse_response_header_easy(headbuf)?;
                         if p.is_none() {
                             Err("Something wrong with response HTTP head")?;
@@ -267,7 +260,7 @@ pub fn http_request_peer(
                     }
                     let remaining = res.buf.len() - res.offset;
                     if remaining == 0 {
-                        Ok(Peer::new(r,w,hup))
+                        Ok(Peer::new(r, w, hup))
                     } else {
                         debug!("{} bytes of debt to be read", remaining);
                         let r = super::trivial_peer::PrependRead {
@@ -275,26 +268,22 @@ pub fn http_request_peer(
                             header: res.buf,
                             remaining,
                         };
-                        Ok(Peer::new(r,w,hup))
+                        Ok(Peer::new(r, w, hup))
                     }
                 })();
                 ::futures::future::result(ret)
             })
-        })
-    ;
+        });
 
     Box::new(f) as BoxedNewPeerFuture
 }
-
 
 #[derive(Debug)]
 pub struct HttpPostSse<T: Specifier>(pub T);
 impl<T: Specifier> Specifier for HttpPostSse<T> {
     fn construct(&self, cp: ConstructParams) -> PeerConstructor {
         let inner = self.0.construct(cp.clone());
-        inner.map(move |p, l2r| {
-            http_response_post_sse_peer(p, l2r)
-        })
+        inner.map(move |p, l2r| http_response_post_sse_peer(p, l2r))
     }
     specifier_boilerplate!(noglobalstate has_subspec);
     self_0_is_subspecifier!(proxy_is_multiconnect);
@@ -328,22 +317,22 @@ enum ModeOfOperation {
     GetSse,
 }
 
-pub fn http_response_post_sse_peer(
-    inner_peer: Peer,
-    _l2r: L2rUser,
-) -> BoxedNewPeerFuture {
+pub fn http_response_post_sse_peer(inner_peer: Peer, _l2r: L2rUser) -> BoxedNewPeerFuture {
     let (r, w, hup) = (inner_peer.0, inner_peer.1, inner_peer.2);
 
-    warn!("Note: http-post-see mode is not tested and may integrate poorly into current Websocat architecture. Expect it to be of lower quality than other Websocat modes.");
+    warn!(
+        "Note: http-post-see mode is not tested and may integrate poorly into current Websocat \
+         architecture. Expect it to be of lower quality than other Websocat modes."
+    );
     info!("Incoming prospective HTTP request");
-    let f = WaitForHttpHead::new(r).and_then(|(res, r)|{
+    let f = WaitForHttpHead::new(r).and_then(|(res, r)| {
         debug!("Got HTTP request head");
-        let ret : Result<_,Box<dyn std::error::Error+'static>> = (move||{
+        let ret: Result<_, Box<dyn std::error::Error + 'static>> = (move || {
             let mode;
             let request;
             {
                 let headbuf = &res.buf[0..res.offset];
-                trace!("{:?}",headbuf);
+                trace!("{:?}", headbuf);
                 let p = http_bytes::parse_request_header_easy(headbuf)?;
                 if p.is_none() {
                     Err("Something wrong with request HTTP head")?;
@@ -358,13 +347,17 @@ pub fn http_response_post_sse_peer(
                     http::method::Method::GET => {
                         info!("GET request. Serving a SSE stream");
                         ModeOfOperation::GetSse
-                    },
+                    }
                     http::method::Method::POST => {
                         info!("POST request. Writing body once");
                         ModeOfOperation::PostBody
-                    },
-                    _ => { 
-                        error!("HTTP request method is {}, but we expect only GET or POST in this mode", method);
+                    }
+                    _ => {
+                        error!(
+                            "HTTP request method is {}, but we expect only GET or POST in this \
+                             mode",
+                            method
+                        );
                         Err("Wrong HTTP request method")?
                     }
                 };
@@ -375,7 +368,7 @@ pub fn http_response_post_sse_peer(
             // (maybe actually we should read the full request first, but
             // let's do some thing at first and correct thing after that).
 
-            use crate::http::header::{HOST,SERVER,CACHE_CONTROL, CONTENT_TYPE};
+            use crate::http::header::{CACHE_CONTROL, CONTENT_TYPE, HOST, SERVER};
 
             let mut reply = crate::http::response::Builder::default();
             let status = match mode {
@@ -400,7 +393,6 @@ pub fn http_response_post_sse_peer(
             Ok(::tokio_io::io::write_all(w, reply)
                 .map_err(box_up_err)
                 .and_then(move |(w, request)| {
-
                     debug!("Response writing finished");
 
                     // Infinitely hang reading or writing
@@ -411,20 +403,20 @@ pub fn http_response_post_sse_peer(
                         ModeOfOperation::GetSse => {
                             // Will it call shutdown(2) on the socket?
                             drop(r);
-                            
+
                             let w = SseStream::new(w);
-                            
+
                             Ok(Peer::new(dummy, w, hup))
-                        },
+                        }
                         ModeOfOperation::PostBody => {
                             debug!("Start streaming POST body upstream, ignoring reverse data");
-                            
+
                             // Will it call shutdown(2) on the socket?
                             drop(w);
 
                             let remaining = res.buf.len() - res.offset;
                             if remaining == 0 {
-                                Ok(Peer::new(r,dummy,hup))
+                                Ok(Peer::new(r, dummy, hup))
                             } else {
                                 debug!("{} bytes of debt to be read", remaining);
                                 let r = super::trivial_peer::PrependRead {
@@ -432,11 +424,11 @@ pub fn http_response_post_sse_peer(
                                     header: res.buf,
                                     remaining,
                                 };
-                                Ok(Peer::new(r,dummy,hup))
+                                Ok(Peer::new(r, dummy, hup))
                             }
-                        },
+                        }
                     }
-            }))
+                }))
         })();
         match ret {
             Err(x) => peer_err2(x),
@@ -446,7 +438,7 @@ pub fn http_response_post_sse_peer(
     Box::new(f) as BoxedNewPeerFuture
 }
 
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 enum SseState {
     BeforeLine(usize),
     InsideLine,
@@ -454,14 +446,13 @@ enum SseState {
     Trailer,
 }
 
-struct SseStream<W : Write>
-{
-    io : W,
+struct SseStream<W: Write> {
+    io: W,
     state: SseState,
-    consumed_actual_buffer : usize,
+    consumed_actual_buffer: usize,
 }
 
-impl<W : Write> SseStream<W> {
+impl<W: Write> SseStream<W> {
     pub fn new(w: W) -> Self {
         SseStream {
             io: w,
@@ -471,13 +462,13 @@ impl<W : Write> SseStream<W> {
     }
 }
 
-impl<W:AsyncWrite> AsyncWrite for SseStream<W> {
+impl<W: AsyncWrite> AsyncWrite for SseStream<W> {
     fn shutdown(&mut self) -> futures::Poll<(), std::io::Error> {
         self.io.shutdown()
     }
 }
 
-impl<W:AsyncWrite> Write for SseStream<W> {
+impl<W: AsyncWrite> Write for SseStream<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         // assumes buffer does not change on EAGAINs
         loop {
@@ -485,22 +476,16 @@ impl<W:AsyncWrite> Write for SseStream<W> {
             let mut need_write = 0;
             debug!("SSE state {:?}", s);
             let ret = match s {
-                SseState::BeforeLine(x) => {
-                    self.io.write(&b"data: "[x..6])
-                }
+                SseState::BeforeLine(x) => self.io.write(&b"data: "[x..6]),
                 SseState::InsideLine => {
                     let buf = &buf[self.consumed_actual_buffer..];
-                    let max = buf.iter().position(|&x|x==b'\n').unwrap_or(buf.len());
+                    let max = buf.iter().position(|&x| x == b'\n').unwrap_or(buf.len());
                     let buf = &buf[0..max];
                     need_write = buf.len();
                     self.io.write(buf)
                 }
-                SseState::AfterLine => {
-                    self.io.write(b"\n")
-                }
-                SseState::Trailer => {
-                    self.io.write(b"\n")
-                }
+                SseState::AfterLine => self.io.write(b"\n"),
+                SseState::Trailer => self.io.write(b"\n"),
             };
             let ll = ret?;
             self.state = match s {
@@ -535,7 +520,7 @@ impl<W:AsyncWrite> Write for SseStream<W> {
                     self.consumed_actual_buffer = 0;
                     self.state = SseState::BeforeLine(0);
                     debug!("r={} buflen={}", r, buf.len());
-                    return Ok(r)
+                    return Ok(r);
                 }
             };
             debug!(" new SSE state {:?}", self.state);

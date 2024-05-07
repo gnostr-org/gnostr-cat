@@ -1,20 +1,19 @@
 extern crate hyper;
 extern crate websocket;
 
-use self::hyper::uri::RequestUri::AbsolutePath;
-
-use self::websocket::WebSocketError;
-use futures::future::{err, Future};
-
 use std::rc::Rc;
 
-use crate::options::StaticFile;
+use futures::future::{err, Future};
 
+use self::hyper::uri::RequestUri::AbsolutePath;
 use self::websocket::server::upgrade::r#async::IntoWs;
-
-use super::ws_peer::{PeerForWs};
-use super::{box_up_err, io_other_error, BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, L2rUser, PeerConstructor, Specifier};
+use self::websocket::WebSocketError;
+use super::ws_peer::PeerForWs;
+use super::{
+    box_up_err, io_other_error, BoxedNewPeerFuture, ConstructParams, L2rUser, Peer,
+    PeerConstructor, Specifier,
+};
+use crate::options::StaticFile;
 
 #[derive(Debug)]
 pub struct WsServer<T: Specifier>(pub T);
@@ -124,9 +123,7 @@ pub fn ws_upgrade_peer(
     let step3 = step2
         .or_else(|(innerpeer, hyper_incoming, _bytesmut, e)| {
             http_serve::http_serve(innerpeer.0, hyper_incoming, serve_static_files)
-            .then(|_|
-                err(WebSocketError::IoError(io_other_error(e)))
-            )
+                .then(|_| err(WebSocketError::IoError(io_other_error(e))))
         })
         .and_then(
             move |mut x| -> Box<dyn Future<Item = Peer, Error = websocket::WebSocketError>> {
@@ -136,12 +133,11 @@ pub fn ws_upgrade_peer(
 
                 let mut protocol_check = true;
                 {
-                    let pp : Option<&WebSocketProtocol> = x.request.headers.get();
+                    let pp: Option<&WebSocketProtocol> = x.request.headers.get();
                     if let Some(rp) = websocket_protocol {
                         // Unconditionally set this protocol
-                        x.headers.set_raw("Sec-WebSocket-Protocol",
-                            vec![rp.as_bytes().to_vec()],
-                        );
+                        x.headers
+                            .set_raw("Sec-WebSocket-Protocol", vec![rp.as_bytes().to_vec()]);
                         // Warn if not present in client protocols
                         let mut present = false;
                         if let Some(pp) = pp {
@@ -153,7 +149,10 @@ pub fn ws_upgrade_peer(
                         }
                         if !present {
                             if pp.is_none() {
-                                warn!("Client failed to specify Sec-WebSocket-Protocol header. Replying with it anyway, against the RFC.");
+                                warn!(
+                                    "Client failed to specify Sec-WebSocket-Protocol header. \
+                                     Replying with it anyway, against the RFC."
+                                );
                             } else {
                                 protocol_check = false;
                             }
@@ -162,7 +161,11 @@ pub fn ws_upgrade_peer(
                         // No protocol specified, just choosing the first if any.
                         if let Some(pp) = pp {
                             if pp.len() > 1 {
-                                warn!("Multiple `Sec-WebSocket-Protocol`s specified in the request. Choosing the first one. Use --server-protocol to make it explicit.")
+                                warn!(
+                                    "Multiple `Sec-WebSocket-Protocol`s specified in the request. \
+                                     Choosing the first one. Use --server-protocol to make it \
+                                     explicit."
+                                )
                             }
                             if let Some(pp) = pp.iter().next() {
                                 x.headers.set_raw(
@@ -183,38 +186,40 @@ pub fn ws_upgrade_peer(
 
                 if !protocol_check {
                     return Box::new(
-                            x.reject()
-                                .and_then(|_| {
-                                    warn!("Requested Sec-WebSocket-Protocol does not match --server-protocol option");
-                                    ::futures::future::err(crate::util::simple_err(
-                                        "Requested Sec-WebSocket-Protocol does not match --server-protocol option"
-                                            .to_string(),
-                                    ))
-                                })
-                                .map_err(|e| websocket::WebSocketError::IoError(io_other_error(e))),
-                        )
-                            as Box<dyn Future<Item = Peer, Error = websocket::WebSocketError>>;
+                        x.reject()
+                            .and_then(|_| {
+                                warn!(
+                                    "Requested Sec-WebSocket-Protocol does not match \
+                                     --server-protocol option"
+                                );
+                                ::futures::future::err(crate::util::simple_err(
+                                    "Requested Sec-WebSocket-Protocol does not match \
+                                     --server-protocol option"
+                                        .to_string(),
+                                ))
+                            })
+                            .map_err(|e| websocket::WebSocketError::IoError(io_other_error(e))),
+                    )
+                        as Box<dyn Future<Item = Peer, Error = websocket::WebSocketError>>;
                 }
-                
-                
+
                 match l2r {
                     L2rUser::FillIn(ref y) => {
                         let uri = &x.request.subject.1;
                         let mut z = y.borrow_mut();
                         z.uri = Some(format!("{}", uri));
 
-                        let h : &websocket::header::Headers = &x.request.headers;
+                        let h: &websocket::header::Headers = &x.request.headers;
                         for q in opts.headers_to_env.iter() {
                             if let Some(v) = h.get_raw(q) {
-                                if v.is_empty() { continue }
+                                if v.is_empty() {
+                                    continue;
+                                }
                                 if v.len() > 1 {
                                     warn!("Extra request header for {} ignored", q);
                                 }
                                 if let Ok(val) = String::from_utf8(v[0].clone()) {
-                                    z.headers.push((
-                                        q.clone(),
-                                        val,
-                                    ));
+                                    z.headers.push((q.clone(), val));
                                 } else {
                                     warn!("Header {} value contains invalid UTF-8", q);
                                 }
@@ -222,11 +227,10 @@ pub fn ws_upgrade_peer(
                                 warn!("No request header {}, so no envvar H_{}", q, q);
                             }
                         }
-                    },
-                    L2rUser::ReadFrom(_) => {},
+                    }
+                    L2rUser::ReadFrom(_) => {}
                 }
-                
-                
+
                 if let Some(ref restrict_uri) = *restrict_uri {
                     let check_passed = match x.request.subject.1 {
                         AbsolutePath(ref x) if x == restrict_uri => true,
@@ -236,7 +240,10 @@ pub fn ws_upgrade_peer(
                         return Box::new(
                             x.reject()
                                 .and_then(|_| {
-                                    warn!("Incoming request URI doesn't match the --restrict-uri value");
+                                    warn!(
+                                        "Incoming request URI doesn't match the --restrict-uri \
+                                         value"
+                                    );
                                     ::futures::future::err(crate::util::simple_err(
                                         "Request URI doesn't match --restrict-uri parameter"
                                             .to_string(),
@@ -247,12 +254,20 @@ pub fn ws_upgrade_peer(
                             as Box<dyn Future<Item = Peer, Error = websocket::WebSocketError>>;
                     }
                 };
-                Box::new(x.accept_with_limits(opts.max_ws_frame_length, opts.max_ws_message_length).map(move |(y, headers)| {
-                    debug!("{:?}", headers);
-                    info!("Upgraded");
-                    let close_on_shutdown =  !opts.websocket_dont_close;
-                    super::ws_peer::finish_building_ws_peer(&*opts, y, close_on_shutdown, None)
-                })) as Box<dyn Future<Item = Peer, Error = websocket::WebSocketError>>
+                Box::new(
+                    x.accept_with_limits(opts.max_ws_frame_length, opts.max_ws_message_length)
+                        .map(move |(y, headers)| {
+                            debug!("{:?}", headers);
+                            info!("Upgraded");
+                            let close_on_shutdown = !opts.websocket_dont_close;
+                            super::ws_peer::finish_building_ws_peer(
+                                &*opts,
+                                y,
+                                close_on_shutdown,
+                                None,
+                            )
+                        }),
+                ) as Box<dyn Future<Item = Peer, Error = websocket::WebSocketError>>
             },
         );
     let step4 = step3.map_err(box_up_err);

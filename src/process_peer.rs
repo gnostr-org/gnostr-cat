@@ -1,23 +1,19 @@
 extern crate tokio_process;
 
+use std::cell::RefCell;
+use std::io::{Read, Result as IoResult, Write};
+use std::process::{Command, ExitStatus, Stdio};
+use std::rc::Rc;
+use std::{self};
+
 use futures;
-use std::io::Result as IoResult;
-use std::io::{Read, Write};
-use std::{self, process::ExitStatus};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use super::{L2rUser, LeftSpecToRightSpec};
-
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use std::process::Command;
-
 use self::tokio_process::{Child, CommandExt};
-
-use super::{once, ConstructParams, PeerConstructor, Specifier};
-use super::{BoxedNewPeerFuture, Peer};
-use std::process::Stdio;
+use super::{
+    once, BoxedNewPeerFuture, ConstructParams, L2rUser, LeftSpecToRightSpec, Peer, PeerConstructor,
+    Specifier,
+};
 
 fn needenv(p: &ConstructParams) -> Option<&LeftSpecToRightSpec> {
     match (p.program_options.exec_set_env, &p.left_to_right) {
@@ -289,11 +285,7 @@ impl Drop for ForgetfulProcess {
                     warn!("Error terminating child process: {}", e);
                 }
             }
-            tokio::spawn(
-                chld.map(|_exc: ExitStatus| {
-
-                }).map_err(|_|())
-            );
+            tokio::spawn(chld.map(|_exc: ExitStatus| {}).map_err(|_| ()));
         } else {
             tokio::spawn(
                 chld.map(|exc: ExitStatus| {

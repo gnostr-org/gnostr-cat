@@ -1,18 +1,20 @@
-use futures::future::{ok, Future};
-
 use std::rc::Rc;
 
-use super::{box_up_err, peer_err, BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, L2rUser, Options, PeerConstructor, Specifier};
+use futures::future::{ok, Future};
+
+use super::{
+    box_up_err, peer_err, BoxedNewPeerFuture, ConstructParams, L2rUser, Options, Peer,
+    PeerConstructor, Specifier,
+};
 
 pub extern crate native_tls;
 extern crate readwrite;
 extern crate tokio_tls;
 
+use std::ffi::{OsStr, OsString};
+
 use self::native_tls::{Identity as Pkcs12, TlsAcceptor, TlsConnector};
 use self::tokio_tls::{TlsAcceptor as TlsAcceptorExt, TlsConnector as TlsConnectorExt};
-
-use std::ffi::{OsStr, OsString};
 
 pub fn interpret_pkcs12(x: &OsStr) -> ::std::result::Result<Vec<u8>, OsString> {
     match (|| {
@@ -53,7 +55,18 @@ impl<T: Specifier> Specifier for TlsConnect<T> {
 specifier_class!(
     name = TlsConnectClass,
     target = TlsConnect,
-    prefixes = ["ssl-connect:","ssl-c:","ssl:","tls:","tls-connect:","tls-c:","c-ssl:","connect-ssl:","c-tls:","connect-tls:"],
+    prefixes = [
+        "ssl-connect:",
+        "ssl-c:",
+        "ssl:",
+        "tls:",
+        "tls-connect:",
+        "tls-c:",
+        "c-ssl:",
+        "connect-ssl:",
+        "c-tls:",
+        "connect-tls:"
+    ],
     arg_handling = subspec,
     overlay = true,
     StreamOriented,
@@ -151,13 +164,18 @@ pub fn ssl_connect(
     _l2r: L2rUser,
     dom: Option<String>,
     tls_insecure: bool,
-    client_identity : Option<Vec<u8>>,
-    client_identity_password : Option<String>,
+    client_identity: Option<Vec<u8>>,
+    client_identity_password: Option<String>,
 ) -> BoxedNewPeerFuture {
     let hup = inner_peer.2;
     let squashed_peer = readwrite::ReadWriteAsync::new(inner_peer.0, inner_peer.1);
 
-    fn gettlsc(nohost: bool, noverify: bool, client_identity : Option<Vec<u8>>, client_identity_password : Option<String>) -> native_tls::Result<TlsConnectorExt> {
+    fn gettlsc(
+        nohost: bool,
+        noverify: bool,
+        client_identity: Option<Vec<u8>>,
+        client_identity_password: Option<String>,
+    ) -> native_tls::Result<TlsConnectorExt> {
         let mut b = TlsConnector::builder();
         if nohost {
             b.danger_accept_invalid_hostnames(true);
@@ -166,7 +184,7 @@ pub fn ssl_connect(
             b.danger_accept_invalid_hostnames(true);
             b.danger_accept_invalid_certs(true);
         }
-        
+
         if let Some(client_ident) = client_identity {
             let identity = super::ssl_peer::native_tls::Identity::from_pkcs12(
                 &client_ident,
@@ -188,7 +206,12 @@ pub fn ssl_connect(
         Ok(TlsConnectorExt::from(tlsc))
     }
 
-    let tls = match gettlsc(dom.is_none(), tls_insecure, client_identity, client_identity_password) {
+    let tls = match gettlsc(
+        dom.is_none(),
+        tls_insecure,
+        client_identity,
+        client_identity_password,
+    ) {
         Ok(x) => x,
         Err(e) => return peer_err(e),
     };
@@ -205,11 +228,18 @@ pub fn ssl_connect(
                 }),
         )
     } else {
-        Box::new(tls.connect("domainverificationdisabled", squashed_peer).map_err(box_up_err).and_then(move |tls_stream| {
-            warn!("Connected to TLS without proper verification of certificate. Use --tls-domain option.");
-            let (r,w) = tls_stream.split();
-            ok(Peer::new(r,w, hup))
-        }))
+        Box::new(
+            tls.connect("domainverificationdisabled", squashed_peer)
+                .map_err(box_up_err)
+                .and_then(move |tls_stream| {
+                    warn!(
+                        "Connected to TLS without proper verification of certificate. Use \
+                         --tls-domain option."
+                    );
+                    let (r, w) = tls_stream.split();
+                    ok(Peer::new(r, w, hup))
+                }),
+        )
     }
 }
 
@@ -248,7 +278,10 @@ pub fn ssl_accept(inner_peer: Peer, _l2r: L2rUser, progopt: Rc<Options>) -> Boxe
                         info!("  the client presented an identity certificate.");
                     }
                     Ok(None) => {
-                        debug!("  no identity certificate from the client. But Websocat may have failed to request it.");
+                        debug!(
+                            "  no identity certificate from the client. But Websocat may have \
+                             failed to request it."
+                        );
                     }
                     Err(e) => {
                         warn!("Error getting identity certificate from client: {}", e);

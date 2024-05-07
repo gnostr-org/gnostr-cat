@@ -1,10 +1,14 @@
-#![cfg_attr(feature="cargo-clippy", allow(collapsible_if,needless_pass_by_value))]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(collapsible_if, needless_pass_by_value)
+)]
 
-use super::{Options, Result, SpecifierClass, SpecifierStack, WebsocatConfiguration2};
-use super::specifier::{SpecifierNode};
+use std::ops::Not;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::ops::Not;
+
+use super::specifier::SpecifierNode;
+use super::{Options, Result, SpecifierClass, SpecifierStack, WebsocatConfiguration2};
 
 extern crate hyper;
 extern crate url;
@@ -17,7 +21,8 @@ use super::socks5_peer::{SocksHostAddr, SocksSocketAddr};
 pub enum StdioUsageStatus {
     /// Does not use standard input or output at all
     None,
-    /// Uses a reuser for connecting multiple peers at stdio, not distinguishing between IsItself and Indirectly
+    /// Uses a reuser for connecting multiple peers at stdio, not distinguishing
+    /// between IsItself and Indirectly
     WithReuser,
     /// Stdio wrapped into something (but not the reuser)
     Indirectly,
@@ -55,7 +60,7 @@ pub trait SpecifierStackExt {
     fn contains(&self, t: &'static str) -> bool;
     fn is_multiconnect(&self) -> bool;
     fn is_stream_oriented(&self) -> bool;
-    fn autotoreconn_misuse(&self)  -> bool;
+    fn autotoreconn_misuse(&self) -> bool;
     fn insert_line_class_in_proper_place(&mut self, x: Rc<dyn SpecifierClass>);
 }
 impl SpecifierStackExt for SpecifierStack {
@@ -94,13 +99,15 @@ impl SpecifierStackExt for SpecifierStack {
         }
         self.addrtype.cls.get_name() == t
     }
-    fn autotoreconn_misuse(&self)  -> bool {
+    fn autotoreconn_misuse(&self) -> bool {
         let mut autoreconnect_found = false;
         for overlay in &self.overlays {
             if overlay.cls.get_name() == "AutoReconnectClass" {
                 autoreconnect_found = true;
             }
-            if overlay.cls.get_name() == "BroadcastReuserClass" || overlay.cls.get_name() == "ReuserClass" {
+            if overlay.cls.get_name() == "BroadcastReuserClass"
+                || overlay.cls.get_name() == "ReuserClass"
+            {
                 if autoreconnect_found {
                     return true;
                 }
@@ -150,7 +157,7 @@ impl SpecifierStackExt for SpecifierStack {
                 MessageBoundaryStatusDependsOnInnerType => insert_idx += 1,
             }
         }
-        self.overlays.insert(insert_idx, SpecifierNode{cls: x});
+        self.overlays.insert(insert_idx, SpecifierNode { cls: x });
     }
 }
 
@@ -192,7 +199,12 @@ impl WebsocatConfiguration2 {
         None
     }
 
-    fn l_stdio(&mut self, multiconnect: bool, reuser_has_been_inserted: &mut bool, r#async: bool) -> Result<()> {
+    fn l_stdio(
+        &mut self,
+        multiconnect: bool,
+        reuser_has_been_inserted: &mut bool,
+        r#async: bool,
+    ) -> Result<()> {
         use self::StdioUsageStatus::{Indirectly, IsItself, None, WithReuser};
         match (self.s1.stdio_usage_status(), self.s2.stdio_usage_status()) {
             (_, None) => (),
@@ -201,7 +213,9 @@ impl WebsocatConfiguration2 {
                 if multiconnect {
                     self.s2.overlays.insert(
                         0,
-                        SpecifierNode{cls:Rc::new(super::broadcast_reuse_peer::BroadcastReuserClass)},
+                        SpecifierNode {
+                            cls: Rc::new(super::broadcast_reuse_peer::BroadcastReuserClass),
+                        },
                     );
                     *reuser_has_been_inserted = true;
                 }
@@ -216,7 +230,10 @@ impl WebsocatConfiguration2 {
                 return Ok(());
             }
             (_, _) => {
-                Err("Too many usages of stdin/stdout. Specify it either on left or right address, not on both.")?;
+                Err(
+                    "Too many usages of stdin/stdout. Specify it either on left or right address, \
+                     not on both.",
+                )?;
             }
         }
 
@@ -225,12 +242,16 @@ impl WebsocatConfiguration2 {
             if r#async {
                 if self.s1.addrtype.cls.get_name() == "StdioClass" {
                     debug!("Substituting StdioClass with AsyncStdioClass at the left");
-                    self.s1.addrtype = SpecifierNode{cls:Rc::new(crate::stdio_peer::AsyncStdioClass)};
-                } 
+                    self.s1.addrtype = SpecifierNode {
+                        cls: Rc::new(crate::stdio_peer::AsyncStdioClass),
+                    };
+                }
                 if self.s2.addrtype.cls.get_name() == "StdioClass" {
                     debug!("Substituting StdioClass with AsyncStdioClass at the right");
-                    self.s2.addrtype = SpecifierNode{cls:Rc::new(crate::stdio_peer::AsyncStdioClass)};
-                } 
+                    self.s2.addrtype = SpecifierNode {
+                        cls: Rc::new(crate::stdio_peer::AsyncStdioClass),
+                    };
+                }
             }
         }
 
@@ -240,7 +261,10 @@ impl WebsocatConfiguration2 {
     fn l_reuser(&mut self, reuser_has_been_inserted: bool) -> Result<()> {
         if self.s1.reuser_count() + self.s2.reuser_count() > 1 {
             if reuser_has_been_inserted {
-                error!("The reuser you specified conflicts with automatically inserted reuser based on usage of stdin/stdout in multiconnect mode.");
+                error!(
+                    "The reuser you specified conflicts with automatically inserted reuser based \
+                     on usage of stdin/stdout in multiconnect mode."
+                );
             }
             Err("Too many usages of connection reuser. Please limit to only one instance.")?;
         }
@@ -276,7 +300,12 @@ impl WebsocatConfiguration2 {
     }
     fn l_listener_on_the_right(&mut self, on_warning: &OnWarning) -> Result<()> {
         if !self.opts.oneshot && self.s2.is_multiconnect() && !self.s1.is_multiconnect() {
-            on_warning("You have specified a listener on the right (as the second positional argument) instead of on the left. It will only serve one connection.\nChange arguments order to enable multiple parallel connections or use --oneshot argument to make single connection explicit.");
+            on_warning(
+                "You have specified a listener on the right (as the second positional argument) \
+                 instead of on the left. It will only serve one connection.\nChange arguments \
+                 order to enable multiple parallel connections or use --oneshot argument to make \
+                 single connection explicit.",
+            );
         }
         Ok(())
     }
@@ -287,21 +316,26 @@ impl WebsocatConfiguration2 {
             && self.s2.reuser_count() == 0
         {
             info!("Auto-inserting the reuser");
-            self.s2
-                .overlays
-                .push(SpecifierNode{cls:Rc::new(super::primitive_reuse_peer::ReuserClass)});
+            self.s2.overlays.push(SpecifierNode {
+                cls: Rc::new(super::primitive_reuse_peer::ReuserClass),
+            });
         };
         Ok(())
     }
     fn l_exec(&mut self, on_warning: &OnWarning) -> Result<()> {
-        if self.s1.addrtype.cls.get_name() == "ExecClass" && self.s2.addrtype.cls.get_name() == "ExecClass"
+        if self.s1.addrtype.cls.get_name() == "ExecClass"
+            && self.s2.addrtype.cls.get_name() == "ExecClass"
         {
             Err("Can't use exec: more than one time. Replace one of them with sh-c: or cmd:.")?;
         }
 
         if let Some(x) = self.get_exec_parameter() {
             if self.opts.exec_args.is_empty() && x.contains(' ') {
-                on_warning("Warning: you specified exec: without the corresponding --exec-args at the end of command line. Unlike in cmd: or sh-c:, spaces inside exec:'s direct parameter are interpreted as part of program name, not as separator.");
+                on_warning(
+                    "Warning: you specified exec: without the corresponding --exec-args at the \
+                     end of command line. Unlike in cmd: or sh-c:, spaces inside exec:'s direct \
+                     parameter are interpreted as part of program name, not as separator.",
+                );
             }
         }
         Ok(())
@@ -337,10 +371,16 @@ impl WebsocatConfiguration2 {
     fn l_environ(&mut self, on_warning: &OnWarning) -> Result<()> {
         if self.opts.exec_set_env {
             if !self.exec_used() {
-                on_warning("-e (--set-environment) is meaningless without a exec: or sh-c: or cmd: address");
+                on_warning(
+                    "-e (--set-environment) is meaningless without a exec: or sh-c: or cmd: \
+                     address",
+                );
             }
             if !self.contains_class("TcpListenClass") && !self.contains_class("WsServerClass") {
-                on_warning("-e (--set-environment) is currently meaningless without a websocket server and/or TCP listener");
+                on_warning(
+                    "-e (--set-environment) is currently meaningless without a websocket server \
+                     and/or TCP listener",
+                );
             }
         }
 
@@ -359,7 +399,10 @@ impl WebsocatConfiguration2 {
                 if !self.opts.unidirectional
                     && (self.opts.unidirectional_reverse || !self.opts.exit_on_eof)
                 {
-                    on_warning("Unfortunately, serving multiple clients without --exit-on-eof (-E) or with -U option is prone to socket leak in this websocat version");
+                    on_warning(
+                        "Unfortunately, serving multiple clients without --exit-on-eof (-E) or \
+                         with -U option is prone to socket leak in this websocat version",
+                    );
                 }
             }
         }
@@ -383,7 +426,9 @@ impl WebsocatConfiguration2 {
         };
 
         // Overwrite WsClientClass
-        s.addrtype = SpecifierNode{cls: Rc::new(super::net_peer::TcpConnectClass) };
+        s.addrtype = SpecifierNode {
+            cls: Rc::new(super::net_peer::TcpConnectClass),
+        };
 
         match opts.auto_socks5.unwrap() {
             SocketAddr::V4(sa4) => {
@@ -425,13 +470,18 @@ impl WebsocatConfiguration2 {
 
         opts.ws_c_uri = url;
 
-        s.overlays
-            .push(SpecifierNode{cls: Rc::new(super::ws_client_peer::WsConnectClass)});
+        s.overlays.push(SpecifierNode {
+            cls: Rc::new(super::ws_client_peer::WsConnectClass),
+        });
         if secure {
             #[cfg(feature = "ssl")]
-            s.overlays.push(SpecifierNode{cls: Rc::new(super::ssl_peer::TlsConnectClass)});
+            s.overlays.push(SpecifierNode {
+                cls: Rc::new(super::ssl_peer::TlsConnectClass),
+            });
         }
-        s.overlays.push(SpecifierNode{cls: Rc::new(super::socks5_peer::SocksProxyClass)});
+        s.overlays.push(SpecifierNode {
+            cls: Rc::new(super::socks5_peer::SocksProxyClass),
+        });
 
         Ok(())
     }
@@ -455,7 +505,10 @@ impl WebsocatConfiguration2 {
                 ^ (self.s2.addrtype.cls.get_name() == "WsClientClass"
                     || self.s2.addrtype.cls.get_name() == "WsClientSecureClass"))
             {
-                Err("User-friendly --socks5 option supports socksifying exactly one non-raw websocket client connection. You are using two or none.")?;
+                Err(
+                    "User-friendly --socks5 option supports socksifying exactly one non-raw \
+                     websocket client connection. You are using two or none.",
+                )?;
             }
 
             if self.s1.addrtype.cls.get_name() == "WsClientClass" {
@@ -486,23 +539,35 @@ impl WebsocatConfiguration2 {
 
     #[cfg(feature = "ssl")]
     fn l_ssl(&mut self, _on_warning: &OnWarning) -> Result<()> {
-        if self.opts.pkcs12_der.is_some() &&  !self.contains_class("TlsAcceptClass") {
+        if self.opts.pkcs12_der.is_some() && !self.contains_class("TlsAcceptClass") {
             Err("--pkcs12-der makes no sense without an TLS connections acceptor")?;
         }
-        if self.opts.pkcs12_der.is_none() &&  self.contains_class("TlsAcceptClass") {
-            Err("You need to specify server key and certificate using the --pkcs12-der option to use the TLS connections acceptor")?;
+        if self.opts.pkcs12_der.is_none() && self.contains_class("TlsAcceptClass") {
+            Err(
+                "You need to specify server key and certificate using the --pkcs12-der option to \
+                 use the TLS connections acceptor",
+            )?;
         }
-        if self.opts.client_pkcs12_der.is_some() && !self.contains_class("WsClientSecureClass") && !self.contains_class("TlsConnectClass") {
+        if self.opts.client_pkcs12_der.is_some()
+            && !self.contains_class("WsClientSecureClass")
+            && !self.contains_class("TlsConnectClass")
+        {
             Err("--client-pkcs12-der makes no sense without wss:// or ssl: connectors")?;
         }
         #[cfg(target_os = "macos")]
         {
-            if (self.opts.pkcs12_der.is_some() && self.opts.pkcs12_passwd.is_none()) || (self.opts.client_pkcs12_der.is_some() && self.opts.client_pkcs12_passwd.is_none()) {
+            if (self.opts.pkcs12_der.is_some() && self.opts.pkcs12_passwd.is_none())
+                || (self.opts.client_pkcs12_der.is_some()
+                    && self.opts.client_pkcs12_passwd.is_none())
+            {
                 _on_warning("PKCS12 archives without password may be unsupported on Mac");
 
                 for x in ::std::env::args() {
                     if x.contains("test.pkcs12") {
-                        _on_warning("If you want a pre-made test certificate, use other file: `--pkcs12-der 1234.pkcs12 --pkcs12-passwd 1234`");
+                        _on_warning(
+                            "If you want a pre-made test certificate, use other file: \
+                             `--pkcs12-der 1234.pkcs12 --pkcs12-passwd 1234`",
+                        );
                         break;
                     }
                 }
@@ -514,15 +579,24 @@ impl WebsocatConfiguration2 {
     fn l_ping(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.opts.ws_ping_interval.is_some() || self.opts.ws_ping_timeout.is_some() {
             if !self.websocket_used() {
-                _on_warning("--ping-interval or --ping-timeout options are not effective if no WebSocket usage is specified")
+                _on_warning(
+                    "--ping-interval or --ping-timeout options are not effective if no WebSocket \
+                     usage is specified",
+                )
             }
         }
         if self.opts.ws_ping_timeout.is_some() && self.opts.ws_ping_interval.is_none() {
-            _on_warning("--ping-timeout specified without --ping-interval. This will probably lead to unconditional disconnection after that interval.")
+            _on_warning(
+                "--ping-timeout specified without --ping-interval. This will probably lead to \
+                 unconditional disconnection after that interval.",
+            )
         }
         if let (Some(t), Some(i)) = (self.opts.ws_ping_timeout, self.opts.ws_ping_interval) {
             if t <= i {
-                _on_warning("--ping-timeout's value is not more than --ping-interval. Expect spurious disconnections.");
+                _on_warning(
+                    "--ping-timeout's value is not more than --ping-interval. Expect spurious \
+                     disconnections.",
+                );
             }
         }
         if self.opts.ws_ping_timeout.is_some() {
@@ -564,10 +638,15 @@ impl WebsocatConfiguration2 {
 
     fn l_eeof_unidir(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.opts.exit_on_eof {
-           if self.opts.unidirectional || self.opts.unidirectional_reverse {
-               _on_warning("--exit-on-eof and --unidirectional[-reverse] options are now useless together");
-               _on_warning("You may want to remove --exit-on-eof. If you are happy with what happens, consider `-uU` instead of `-uE`.");
-           }
+            if self.opts.unidirectional || self.opts.unidirectional_reverse {
+                _on_warning(
+                    "--exit-on-eof and --unidirectional[-reverse] options are now useless together",
+                );
+                _on_warning(
+                    "You may want to remove --exit-on-eof. If you are happy with what happens, \
+                     consider `-uU` instead of `-uE`.",
+                );
+            }
         }
         Ok(())
     }
@@ -575,9 +654,12 @@ impl WebsocatConfiguration2 {
     fn l_udp(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.opts.udp_join_multicast_addr.is_empty().not() {
             if self.opts.udp_broadcast {
-                _on_warning("Both --udp-broadcast and a multicast address is set. This is strange.");
+                _on_warning(
+                    "Both --udp-broadcast and a multicast address is set. This is strange.",
+                );
             }
-            let ifs = self.opts.udp_join_multicast_iface_v4.len() + self.opts.udp_join_multicast_iface_v6.len();
+            let ifs = self.opts.udp_join_multicast_iface_v4.len()
+                + self.opts.udp_join_multicast_iface_v6.len();
             if ifs != 0 {
                 let mut v4_multicasts = 0;
                 let mut v6_multicasts = 0;
@@ -588,10 +670,18 @@ impl WebsocatConfiguration2 {
                     }
                 }
                 if v4_multicasts != self.opts.udp_join_multicast_iface_v4.len() {
-                    return Err("--udp-multicast-iface-v4 option mush be specified the same number of times as IPv4 addresses for --udp-multicast (alternatively --udp-multicast-iface-* options should be not specified at all)")?;
+                    return Err(
+                        "--udp-multicast-iface-v4 option mush be specified the same number of \
+                         times as IPv4 addresses for --udp-multicast (alternatively \
+                         --udp-multicast-iface-* options should be not specified at all)",
+                    )?;
                 }
                 if v6_multicasts != self.opts.udp_join_multicast_iface_v6.len() {
-                    return Err("--udp-multicast-iface-v6 option mush be specified the same number of times as IPv6 addresses for --udp-multicast (alternatively --udp-multicast-iface-* options should be not specified at all)")?;
+                    return Err(
+                        "--udp-multicast-iface-v6 option mush be specified the same number of \
+                         times as IPv6 addresses for --udp-multicast (alternatively \
+                         --udp-multicast-iface-* options should be not specified at all)",
+                    )?;
                 }
             }
         } else {
@@ -602,7 +692,7 @@ impl WebsocatConfiguration2 {
         Ok(())
     }
     fn l_crypto(&mut self, _on_warning: &OnWarning) -> Result<()> {
-        #[cfg(feature="crypto_peer")]
+        #[cfg(feature = "crypto_peer")]
         if self.opts.crypto_key.is_some() {
             if !self.contains_class("CryptoClass") {
                 _on_warning("--crypto-key option is meaningless without a `crypto:` overlay");
@@ -611,33 +701,57 @@ impl WebsocatConfiguration2 {
         Ok(())
     }
     fn l_prometheus(&mut self, _on_warning: &OnWarning) -> Result<()> {
-        #[cfg(feature="prometheus_peer")]
+        #[cfg(feature = "prometheus_peer")]
         if self.opts.prometheus.is_some() {
             if !self.contains_class("PrometheusClass") {
-                self.s2.overlays.insert(0, SpecifierNode { cls: Rc::new(crate::prometheus_peer::PrometheusClass) });
+                self.s2.overlays.insert(
+                    0,
+                    SpecifierNode {
+                        cls: Rc::new(crate::prometheus_peer::PrometheusClass),
+                    },
+                );
             }
         } else {
             if self.contains_class("PrometheusClass") {
-                _on_warning("Using `prometheus:` overlay without `--prometheus` option is meaningless");
+                _on_warning(
+                    "Using `prometheus:` overlay without `--prometheus` option is meaningless",
+                );
             }
         }
         Ok(())
     }
     fn l_sizelimits(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.opts.max_ws_message_length < self.opts.max_ws_frame_length {
-            _on_warning("Lowering --max-ws-message-length without also lowering --max-ws-frame-length may be meaningless, as the former only affects whether to begin accept a new frame or not, given accumulated message size. Succesfully accepted frames within the frame size limit may exceed the message size.")
+            _on_warning(
+                "Lowering --max-ws-message-length without also lowering --max-ws-frame-length may \
+                 be meaningless, as the former only affects whether to begin accept a new frame \
+                 or not, given accumulated message size. Succesfully accepted frames within the \
+                 frame size limit may exceed the message size.",
+            )
         }
         Ok(())
     }
     fn l_compress(&mut self, _on_warning: &OnWarning) -> Result<()> {
         let mut cn = 0;
         let mut un = 0;
-        if self.opts.compress_deflate { cn += 1 }
-        if self.opts.compress_gzip { cn += 1 }
-        if self.opts.compress_zlib { cn += 1 }
-        if self.opts.uncompress_deflate { un += 1 }
-        if self.opts.uncompress_gzip { un += 1 }
-        if self.opts.uncompress_zlib { un += 1 }
+        if self.opts.compress_deflate {
+            cn += 1
+        }
+        if self.opts.compress_gzip {
+            cn += 1
+        }
+        if self.opts.compress_zlib {
+            cn += 1
+        }
+        if self.opts.uncompress_deflate {
+            un += 1
+        }
+        if self.opts.uncompress_gzip {
+            un += 1
+        }
+        if self.opts.uncompress_zlib {
+            un += 1
+        }
         if cn > 1 {
             return Err("Multiple --compress-* options specifed")?;
         }
@@ -645,7 +759,7 @@ impl WebsocatConfiguration2 {
             return Err("Multiple --uncompress-* options specifed")?;
         }
 
-        #[cfg(not(feature="compression"))]
+        #[cfg(not(feature = "compression"))]
         {
             if cn > 0 || un > 0 {
                 return Err("Compression support is not selected during Websocat compilation")?;
@@ -653,7 +767,7 @@ impl WebsocatConfiguration2 {
         }
         Ok(())
     }
-    #[cfg(feature="native_plugins")]
+    #[cfg(feature = "native_plugins")]
     fn l_plugins(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.contains_class("NativeTransformAClass") && self.opts.native_transform_a.is_none() {
             return Err("--native-plugin-a must be specified to use `native_plugin_transform_a:`")?;
@@ -669,12 +783,12 @@ impl WebsocatConfiguration2 {
         }
         Ok(())
     }
-    #[cfg(not(feature="native_plugins"))]
+    #[cfg(not(feature = "native_plugins"))]
     fn l_plugins(&mut self, _on_warning: &OnWarning) -> Result<()> {
         Ok(())
     }
 
-    #[cfg(feature="wasm_plugins")]
+    #[cfg(feature = "wasm_plugins")]
     fn l_wasm(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.contains_class("WasmTransformAClass") && self.opts.wasm_transform_a.is_none() {
             return Err("--wasm-plugin-a must be specified to use `wasm_plugin_transform_a:`")?;
@@ -690,14 +804,17 @@ impl WebsocatConfiguration2 {
         }
         Ok(())
     }
-    #[cfg(not(feature="wasm_plugins"))]
+    #[cfg(not(feature = "wasm_plugins"))]
     fn l_wasm(&mut self, _on_warning: &OnWarning) -> Result<()> {
         Ok(())
     }
 
     fn l_autoreconn_reuse(&mut self, _on_warning: &OnWarning) -> Result<()> {
         if self.s1.autotoreconn_misuse() || self.s2.autotoreconn_misuse() {
-            _on_warning("Warning: `autoreconnect:reuse:` is a bad overlay combination. Maybe you want `reuse:autoreconnect:");
+            _on_warning(
+                "Warning: `autoreconnect:reuse:` is a bad overlay combination. Maybe you want \
+                 `reuse:autoreconnect:",
+            );
         }
         Ok(())
     }
@@ -707,7 +824,11 @@ impl WebsocatConfiguration2 {
         let mut reuser_has_been_inserted = false;
 
         self.l_prometheus(&on_warning)?;
-        self.l_stdio(multiconnect, &mut reuser_has_been_inserted, self.opts.asyncstdio)?;
+        self.l_stdio(
+            multiconnect,
+            &mut reuser_has_been_inserted,
+            self.opts.asyncstdio,
+        )?;
         self.l_reuser(reuser_has_been_inserted)?;
         self.l_linemode()?;
         self.l_listener_on_the_right(&on_warning)?;

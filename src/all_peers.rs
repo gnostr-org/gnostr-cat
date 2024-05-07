@@ -19,7 +19,6 @@ macro_rules! list_of_all_specifier_classes {
         $your_macro!($crate::http_peer::HttpRequestClass);
         $your_macro!($crate::http_peer::HttpClass);
         $your_macro!($crate::http_peer::HttpPostSseClass);
-        
 
         #[cfg(all(unix, feature = "unix_stdio"))]
         $your_macro!($crate::stdio_peer::AsyncStdioClass);
@@ -79,7 +78,7 @@ macro_rules! list_of_all_specifier_classes {
         #[cfg(unix)]
         $your_macro!($crate::unix_peer::AbstractDgramClass);
 
-        #[cfg(all(windows,feature = "windows_named_pipes"))]
+        #[cfg(all(windows, feature = "windows_named_pipes"))]
         $your_macro!($crate::windows_np_peer::NamedPipeConnectClass);
 
         $your_macro!($crate::line_peer::Message2LineClass);

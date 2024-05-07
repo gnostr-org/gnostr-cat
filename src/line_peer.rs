@@ -1,14 +1,10 @@
-use futures::future::ok;
-
+use std::io::{Error as IoError, Read};
 use std::rc::Rc;
 
-use super::{BoxedNewPeerFuture, Peer};
-use super::{ConstructParams, PeerConstructor, Specifier};
-
-use std::io::Read;
+use futures::future::ok;
 use tokio_io::AsyncRead;
 
-use std::io::Error as IoError;
+use super::{BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor, Specifier};
 
 #[derive(Debug)]
 pub struct Message2Line<T: Specifier>(pub T);
@@ -61,14 +57,14 @@ impl<T: Specifier> Specifier for Line2Message<T> {
     self_0_is_subspecifier!(proxy_is_multiconnect);
 }
 specifier_class!(
-    name=Line2MessageClass, 
-    target=Line2Message,
-    prefixes=["line2msg:"], 
-    arg_handling=subspec,
+    name = Line2MessageClass,
+    target = Line2Message,
+    prefixes = ["line2msg:"],
+    arg_handling = subspec,
     overlay = true,
     MessageOriented,
     MulticonnectnessDependsOnInnerType,
-    help=r#"
+    help = r#"
 Line filter: turn lines from byte stream into messages as delimited by '\\n' or '\\0' [A]
 
 Ensure that each message (a successful read call) is obtained from a line [A]
@@ -173,11 +169,21 @@ impl Line2PacketWrapper {
     fn deliver_the_line(&mut self, buf: &mut [u8], mut n: usize) -> Option<usize> {
         if n > buf.len() {
             if self.drop_too_long_lines {
-                error!("Dropping too long line of {} bytes because of buffer (-B option) is only {} bytes", n, buf.len());
+                error!(
+                    "Dropping too long line of {} bytes because of buffer (-B option) is only {} \
+                     bytes",
+                    n,
+                    buf.len()
+                );
                 drop(self.queue.drain(0..n));
                 return None;
             } else {
-                warn!("Splitting too long line of {} bytes because of buffer (-B option) is only {} bytes", n, buf.len());
+                warn!(
+                    "Splitting too long line of {} bytes because of buffer (-B option) is only {} \
+                     bytes",
+                    n,
+                    buf.len()
+                );
                 n = buf.len();
             }
         } else {

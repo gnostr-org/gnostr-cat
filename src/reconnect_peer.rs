@@ -1,17 +1,18 @@
 extern crate futures;
 extern crate tokio_io;
 
-use futures::future::ok;
 use std::cell::RefCell;
+use std::io::{Error as IoError, Read, Write};
 use std::rc::Rc;
 
-use super::{BoxedNewPeerFuture, Peer};
-
-use std::io::{Error as IoError, Read, Write};
+use futures::future::ok;
+use futures::{Async, Future, Poll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use super::{once, simple_err, wouldblock, ConstructParams, PeerConstructor, Specifier};
-use futures::{Async, Future, Poll};
+use super::{
+    once, simple_err, wouldblock, BoxedNewPeerFuture, ConstructParams, Peer, PeerConstructor,
+    Specifier,
+};
 
 // TODO: shutdown write part if out writing part is shut down
 // TODO: stop if writing part and reading parts are closed (shutdown)?
@@ -66,7 +67,8 @@ struct State {
     pegged_until_write: bool,
 }
 
-/// This implementation's poll is to be reused many times, both after returning item and error
+/// This implementation's poll is to be reused many times, both after returning
+/// item and error
 impl State {
     //type Item = &'mut Peer;
     //type Error = Box<::std::error::Error>;
@@ -100,7 +102,9 @@ impl State {
             }
             if self.reconnect_count_limit == Some(0) {
                 info!("autoreconnector reconnect limit reached. Failing connection.");
-                return Err(Box::new(simple_err("No more connections allowed".to_owned())));
+                return Err(Box::new(simple_err(
+                    "No more connections allowed".to_owned(),
+                )));
             }
 
             if let Some(mut bnpf) = nn.take() {
@@ -130,12 +134,17 @@ impl State {
 
                         if !aux.already_warned {
                             aux.already_warned = true;
-                            warn!("Reconnecting failed. Further failed reconnects announcements will have lower log severity.");
+                            warn!(
+                                "Reconnecting failed. Further failed reconnects announcements \
+                                 will have lower log severity."
+                            );
                         } else {
                             info!("Reconnecting failed.");
                         }
 
-                        self.ratelimiter = Some(tokio_timer::Delay::new(std::time::Instant::now() + self.reconnect_delay));
+                        self.ratelimiter = Some(tokio_timer::Delay::new(
+                            std::time::Instant::now() + self.reconnect_delay,
+                        ));
                         continue;
                     }
                 }
@@ -241,7 +250,8 @@ impl AsyncWrite for PeerHandle {
 }
 
 pub fn autoreconnector(s: Rc<dyn Specifier>, cp: ConstructParams) -> BoxedNewPeerFuture {
-    let reconnect_delay = std::time::Duration::from_millis(cp.program_options.autoreconnect_delay_millis);
+    let reconnect_delay =
+        std::time::Duration::from_millis(cp.program_options.autoreconnect_delay_millis);
     let s = Rc::new(RefCell::new(State {
         cp,
         s,
@@ -259,9 +269,9 @@ pub fn autoreconnector(s: Rc<dyn Specifier>, cp: ConstructParams) -> BoxedNewPee
     Box::new(ok(peer)) as BoxedNewPeerFuture
 }
 
-
 pub fn waitfordata(s: Rc<dyn Specifier>, cp: ConstructParams) -> BoxedNewPeerFuture {
-    let reconnect_delay = std::time::Duration::from_millis(cp.program_options.autoreconnect_delay_millis);
+    let reconnect_delay =
+        std::time::Duration::from_millis(cp.program_options.autoreconnect_delay_millis);
     let s = Rc::new(RefCell::new(State {
         cp,
         s,
@@ -275,10 +285,11 @@ pub fn waitfordata(s: Rc<dyn Specifier>, cp: ConstructParams) -> BoxedNewPeerFut
     }));
     let ph1 = PeerHandle(s.clone());
     let ph2 = PeerHandle(s);
-    let peer = Peer::new(ph1, ph2, None /* we handle hups ourselves, though shouldn't probably */);
+    let peer = Peer::new(
+        ph1, ph2, None, /* we handle hups ourselves, though shouldn't probably */
+    );
     Box::new(ok(peer)) as BoxedNewPeerFuture
 }
-
 
 #[derive(Debug)]
 pub struct WaitForData(pub Rc<dyn Specifier>);

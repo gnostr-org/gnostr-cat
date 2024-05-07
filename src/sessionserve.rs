@@ -1,13 +1,14 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use {std, tokio_io};
+
 use super::futures::{Future, Stream};
 use super::{
     futures, my_copy, ConstructParams, L2rUser, L2rWriter, Options, Peer, PeerConstructor,
     ProgramState, Session, Specifier, Transfer,
 };
 use crate::spawn_hack;
-use std;
-use std::cell::RefCell;
-use std::rc::Rc;
-use tokio_io;
 
 impl Session {
     pub fn run(self) -> Box<dyn Future<Item = (), Error = Box<dyn std::error::Error>>> {
@@ -22,13 +23,18 @@ impl Session {
         let mut co2 = co1.clone();
         co2.max_ops = self.opts.max_messages_rev;
         if self.opts.unidirectional {
-            co2.skip=true;
+            co2.skip = true;
         }
         if self.opts.unidirectional_reverse {
-            co1.skip=true;
+            co1.skip = true;
         }
         let f1 = my_copy::copy(self.t1.from, self.t1.to, co1, self.opts.preamble.clone());
-        let f2 = my_copy::copy(self.t2.from, self.t2.to, co2, self.opts.preamble_reverse.clone());
+        let f2 = my_copy::copy(
+            self.t2.from,
+            self.t2.to,
+            co2,
+            self.opts.preamble_reverse.clone(),
+        );
 
         let f1 = f1.and_then(|(_, r, w)| {
             info!("Forward finished");
@@ -77,15 +83,11 @@ impl Session {
             if let Some(hup) = self.hup2 {
                 s.push(hup);
             }
-            Box::new(
-                s.into_future()
-                .map(|(x, _)|x.unwrap())
-                .map_err(|(e,_)|e)
-            ) as Ret
+            Box::new(s.into_future().map(|(x, _)| x.unwrap()).map_err(|(e, _)| e)) as Ret
         }
     }
     pub fn new(peer1: Peer, peer2: Peer, opts: Rc<Options>) -> Self {
-        Session{
+        Session {
             t1: Transfer {
                 from: peer1.0,
                 to: peer2.1,
@@ -147,7 +149,6 @@ where
         left_to_right: L2rUser::FillIn(l2r.clone()),
     }));
 
-
     #[cfg(feature = "prometheus_peer")]
     {
         if let Some(psa) = opts1.prometheus {
@@ -172,7 +173,7 @@ where
         PeerConstructor::Error(e) => {
             e1(e);
             Box::new(futures::future::ok(())) as Box<dyn Future<Item = (), Error = ()>>
-        },
+        }
         ServeMultipleTimes(stream) => {
             let runner = stream
                 .map(move |peer1| {

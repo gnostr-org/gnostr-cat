@@ -1,8 +1,7 @@
 use super::{
-    futures, AsyncRead, AsyncWrite, BoxedNewPeerFuture, BoxedNewPeerStream, L2rUser, Peer,
-    PeerConstructor, Rc, HupToken,
+    futures, AsyncRead, AsyncWrite, BoxedNewPeerFuture, BoxedNewPeerStream, Future, HupToken,
+    L2rUser, Peer, PeerConstructor, Rc, Stream,
 };
-use super::{Future, Stream};
 
 pub fn wouldblock<T>() -> std::io::Result<T> {
     Err(std::io::Error::new(std::io::ErrorKind::WouldBlock, ""))
@@ -88,9 +87,7 @@ pub fn peer_err<E: std::error::Error + 'static>(e: E) -> BoxedNewPeerFuture {
     )) as BoxedNewPeerFuture
 }
 pub fn peer_err2(e: Box<dyn std::error::Error>) -> BoxedNewPeerFuture {
-    Box::new(futures::future::err(
-        e
-    )) as BoxedNewPeerFuture
+    Box::new(futures::future::err(e)) as BoxedNewPeerFuture
 }
 pub fn peer_err_s<E: std::error::Error + 'static>(e: E) -> BoxedNewPeerStream {
     Box::new(futures::stream::iter_result(vec![Err(
@@ -98,9 +95,7 @@ pub fn peer_err_s<E: std::error::Error + 'static>(e: E) -> BoxedNewPeerStream {
     )])) as BoxedNewPeerStream
 }
 pub fn peer_err_sb(e: Box<dyn std::error::Error + 'static>) -> BoxedNewPeerStream {
-    Box::new(futures::stream::iter_result(vec![Err(
-        e
-    )])) as BoxedNewPeerStream
+    Box::new(futures::stream::iter_result(vec![Err(e)])) as BoxedNewPeerStream
 }
 pub fn peer_strerr(e: &str) -> BoxedNewPeerFuture {
     let q: Box<dyn std::error::Error> = From::from(e);
@@ -119,7 +114,11 @@ pub fn box_up_err<E: std::error::Error + 'static>(e: E) -> Box<dyn std::error::E
 }
 
 impl Peer {
-    pub fn new<R: AsyncRead + 'static, W: AsyncWrite + 'static>(r: R, w: W, hup: Option<HupToken>) -> Self {
+    pub fn new<R: AsyncRead + 'static, W: AsyncWrite + 'static>(
+        r: R,
+        w: W,
+        hup: Option<HupToken>,
+    ) -> Self {
         Peer(
             Box::new(r) as Box<dyn AsyncRead>,
             Box::new(w) as Box<dyn AsyncWrite>,
