@@ -1,6 +1,6 @@
 [package]
 name = "gnostr-cat"
-version = "0.0.6"
+version = "0.0.7"
 authors = ["gnostr <admin@gnostr.org>", "Vitaly \"_Vi\" Shukela <vi0oss@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/gnostr-org/gnostr-cat"
